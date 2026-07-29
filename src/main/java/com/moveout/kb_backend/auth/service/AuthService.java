@@ -2,6 +2,8 @@ package com.moveout.kb_backend.auth.service;
 
 import com.moveout.kb_backend.auth.dto.LoginRequest;
 import com.moveout.kb_backend.auth.dto.LoginResponse;
+import com.moveout.kb_backend.auth.dto.SignupRequest;
+import com.moveout.kb_backend.auth.dto.SignupResponse;
 import org.springframework.stereotype.Service;
 
 @Service
