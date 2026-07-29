@@ -1,0 +1,35 @@
+[
+    {
+      "productId": "KB-LOAN-001",
+      "bankName": "KB국민은행",
+      "productName": "KB 청년 맞춤형 전세자금대출",
+      "category": "전세자금대출",
+      "minInterestRate": 3.42,
+      "maxInterestRate": 4.15,
+      "maxLimit": 200000000,
+      "targetDescription": "만 19세 이상 ~ 만 34세 이하 무주택 청년 (연소득 7천만 원 이하)",
+      "officialUrl": "https://kbstar.com"
+    },
+    {
+      "productId": "KB-LOAN-002",
+      "bankName": "KB국민은행",
+      "productName": "KB 버팀목 전세자금대출 (정부연계)",
+      "category": "전세자금대출",
+      "minInterestRate": 2.10,
+      "maxInterestRate": 2.90,
+      "maxLimit": 220000000,
+      "targetDescription": "부부합산 연소득 5천만 원 이하 무주택 세대주",
+      "officialUrl": "https://kbstar.com"
+    },
+    {
+      "productId": "KB-LOAN-003",
+      "bankName": "KB국민은행",
+      "productName": "KB 내집마련 주택담보대출",
+      "category": "주택담보대출",
+      "minInterestRate": 3.85,
+      "maxInterestRate": 4.80,
+      "maxLimit": 500000000,
+      "targetDescription": "주택 구입 자금이 필요한 무주택자 또는 1주택자",
+      "officialUrl": "https://kbstar.com"
+    }
+  ]
