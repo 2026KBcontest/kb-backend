@@ -12,4 +12,8 @@ public class AuthService {
         String mockToken = "mock-jwt-token-kb-2026";
         return new LoginResponse(1L, request.getEmail(), "김국민", mockToken);
     }
+    public SignupResponse signup(SignupRequest request) {
+        // 임시 회원가입 성공 응답
+        return new SignupResponse(1L, "회원가입이 완료되었습니다.");
+    }
 }
