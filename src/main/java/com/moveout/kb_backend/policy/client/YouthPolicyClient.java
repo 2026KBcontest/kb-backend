@@ -1,5 +1,6 @@
 package com.moveout.kb_backend.policy.client;
 
+import com.moveout.kb_backend.policy.dto.PolicyItemDto;
 import com.moveout.kb_backend.policy.dto.PolicyRequest;
 import com.moveout.kb_backend.policy.dto.PolicyResponse;
 import com.moveout.kb_backend.policy.dto.YouthPolicyXmlResponse;
@@ -9,6 +10,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class YouthPolicyClient {
@@ -26,11 +29,11 @@ public class YouthPolicyClient {
     }
 
     /**
-     * 온통청년 API 호출 및 XML 파싱
+     * 온통청년 API 호출 및 XML 파싱 (Spring Boot 3.x UriComponentsBuilder 규격)
      */
     public YouthPolicyXmlResponse fetchRawPolicyData(int pageIndex, int displayCount) {
         try {
-            URI uri = UriComponentsBuilder.fromUriString(apiUrl)
+            URI uri = UriComponentsBuilder.fromUriString(apiUrl) // fromHttpUrl -> fromUriString 으로 변경
                     .queryParam("openApiVcntId", apiKey)
                     .queryParam("pageIndex", pageIndex)
                     .queryParam("display", displayCount)
@@ -38,7 +41,6 @@ public class YouthPolicyClient {
                     .encode()
                     .toUri();
 
-            // XML 응답을 Java DTO 객체로 자동 파싱
             return restTemplate.getForObject(uri, YouthPolicyXmlResponse.class);
 
         } catch (Exception e) {
@@ -48,28 +50,40 @@ public class YouthPolicyClient {
     }
 
     /**
-     * 기존 컨트롤러 단과의 호환성을 위한 단건 호출 메서드
+     * 컨트롤러 단 호환용 백업 API 호출 메서드
      */
     public PolicyResponse fetchPolicyData(PolicyRequest request) {
-        YouthPolicyXmlResponse response = fetchRawPolicyData(1, 1);
+        YouthPolicyXmlResponse response = fetchRawPolicyData(1, 4);
+        List<PolicyItemDto> items = new ArrayList<>();
 
         if (response != null && response.getEmpList() != null && !response.getEmpList().isEmpty()) {
-            YouthPolicyXmlResponse.PolicyItem item = response.getEmpList().get(0);
-            return new PolicyResponse(
-                    item.getPolyBizSjnm(),
-                    item.getPolyItcnCn(),
-                    item.getAgeInfo(),
-                    item.getRqutUrla()
-            );
+            for (YouthPolicyXmlResponse.PolicyItem item : response.getEmpList()) {
+                String rawSummary = item.getPolyItcnCn() != null ? item.getPolyItcnCn() : "청년 지원 정책입니다.";
+                String desc = rawSummary.length() > 25 ? rawSummary.substring(0, 22) + "..." : rawSummary;
+
+                items.add(PolicyItemDto.builder()
+                        .policyId(item.getBizId() != null ? item.getBizId() : "policy-id")
+                        .policyName(item.getPolyBizSjnm())
+                        .description(desc)
+                        .eligibility(item.getAgeInfo() != null ? item.getAgeInfo() : "만 19~34세 대상")
+                        .status("신청 가능")
+                        .link(item.getRqutUrla())
+                        .build());
+            }
+            return new PolicyResponse(items, "온통청년 API 실시간 데이터 기반 추천 정책입니다.");
         }
 
         // Fallback 데이터
         String region = (request.getRegion() != null) ? request.getRegion() : "전국";
-        return new PolicyResponse(
-                "[" + region + "] 청년 주거 지원 정책",
-                "현재 API 응답이 없거나 기본 안내 모드입니다.",
-                "만 19세~34세 청년 대상",
-                "https://www.youthcenter.go.kr"
-        );
+        items.add(PolicyItemDto.builder()
+                .policyId("fallback-1")
+                .policyName("[" + region + "] 청년 주거 지원 정책")
+                .description("기본 주거 보증금 지원 안내")
+                .eligibility("만 19세~34세 청년 대상")
+                .status("조건 확인 필요")
+                .link("https://www.youthcenter.go.kr")
+                .build());
+
+        return new PolicyResponse(items, "현재 API 응답이 원활하지 않아 기본 정책 목록을 안내합니다.");
     }
 }

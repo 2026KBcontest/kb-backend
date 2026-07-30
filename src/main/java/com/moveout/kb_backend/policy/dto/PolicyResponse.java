@@ -5,14 +5,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class PolicyResponse {
 
-    private String title;       // 정책명
-    private String summary;     // 정책 요약
-    private String ageInfo;     // 연령 자격 조건
-    private String applyUrl;    // 신청 페이지 링크
+    private List<PolicyItemDto> policies;
+    private String aiReason;
 }
