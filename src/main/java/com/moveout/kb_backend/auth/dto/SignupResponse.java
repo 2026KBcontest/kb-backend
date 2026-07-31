@@ -1,5 +1,6 @@
 package com.moveout.kb_backend.auth.dto;
 
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,6 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SignupResponse {
-    private Long userId;
+    private UUID userId;
     private String message;
 }

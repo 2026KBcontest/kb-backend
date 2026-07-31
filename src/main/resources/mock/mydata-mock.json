@@ -1,0 +1,23 @@
+{
+  "monthlyConsumption": {
+    "food": 350000,
+    "culture": 120000,
+    "shopping": 200000,
+    "etc": 80000,
+    "fixedCost": {
+      "transport": 90000,
+      "telecom": 60000,
+      "insurance": 150000,
+      "subscription": 30000,
+      "loanInterest": 100000,
+      "housing": 500000
+    }
+  },
+  "asset": {
+    "deposit": 5000000,
+    "saving": 3000000,
+    "investment": 10000000,
+    "loan": 20000000,
+    "remainingRepayment": 15000000
+  }
+}
