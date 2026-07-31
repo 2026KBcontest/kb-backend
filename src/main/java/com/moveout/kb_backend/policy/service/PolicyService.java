@@ -1,100 +1,93 @@
 package com.moveout.kb_backend.policy.service;
 
-import com.moveout.kb_backend.policy.client.YouthPolicyClient;
 import com.moveout.kb_backend.policy.dto.PolicyItemDto;
 import com.moveout.kb_backend.policy.dto.PolicyRequest;
 import com.moveout.kb_backend.policy.dto.PolicyResponse;
-import com.moveout.kb_backend.policy.dto.YouthPolicyXmlResponse;
-import com.moveout.kb_backend.policy.entity.YouthPolicy;
-import com.moveout.kb_backend.policy.repository.YouthPolicyRepository;
-import lombok.RequiredArgsConstructor;
+import com.moveout.kb_backend.policy.dto.RecommendationDto;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class PolicyService {
 
-    private final YouthPolicyClient youthPolicyClient;
-    private final YouthPolicyRepository youthPolicyRepository;
+    public PolicyResponse getRecommendedPolicies(PolicyRequest request) {
+        // [시연용 Fallback 데이터 4건 확장]
+        List<PolicyItemDto> fallbackPolicies = List.of(
+            PolicyItemDto.builder()
+                .policyId("youth-rent-01")
+                .name("서울시 청년 월세 지원")
+                .category("HOUSING")
+                .description("청년층의 주거비 부담 완화를 위해 월세를 지원합니다.")
+                .status("신청 가능")
+                .link("https://youth.seoul.go.kr")
+                .supportAmount(2400000)
+                .supportNote("월 20만원 × 12개월")
+                .build(),
+            PolicyItemDto.builder()
+                .policyId("youth-jeonse-02")
+                .name("청년 버팀목 전세자금대출")
+                .category("LOAN")
+                .description("무주택 청년 전세보증금 저리 대출 지원 서비스입니다.")
+                .status("신청 가능")
+                .link("https://nhuf.molit.go.kr")
+                .supportAmount(null)
+                .supportNote("대출 한도 우대 (최대 2억원)")
+                .build(),
+            PolicyItemDto.builder()
+                .policyId("youth-savings-03")
+                .name("청년도약계좌 정부기여금")
+                .category("SAVINGS")
+                .description("만기 5년 동안 매월 납입금에 비례해 정부기여금을 지원합니다.")
+                .status("조건 확인 필요")
+                .link("https://kinfa.or.kr")
+                .supportAmount(1440000)
+                .supportNote("최대 월 2.4만원 × 60개월")
+                .build(),
+            PolicyItemDto.builder()
+                .policyId("youth-transport-04")
+                .name("K-패스 청년 대중교통비 환급")
+                .category("TRANSPORT")
+                .description("대중교통 이용 금액의 30%를 적립 및 환급해 드립니다.")
+                .status("신청 가능")
+                .link("https://korea-pass.kr")
+                .supportAmount(360000)
+                .supportNote("월 평균 3만원 환급 기준")
+                .build()
+        );
 
-    @Transactional
-    public int syncYouthPoliciesFromApi(int pageIndex, int displayCount) {
-        YouthPolicyXmlResponse xmlResponse = youthPolicyClient.fetchRawPolicyData(pageIndex, displayCount);
-
-        if (xmlResponse == null || xmlResponse.getEmpList() == null) {
-            return 0;
+        // 조건 검색 결과가 없을 경우 (404 대신 빈 배열과 null 반환)
+        if (fallbackPolicies == null || fallbackPolicies.isEmpty()) {
+            return PolicyResponse.builder()
+                .policies(Collections.emptyList())
+                .recommendation(null)
+                .build();
         }
 
-        int savedCount = 0;
-        for (YouthPolicyXmlResponse.PolicyItem item : xmlResponse.getEmpList()) {
-            if (youthPolicyRepository.findByBizId(item.getBizId()).isPresent()) {
-                continue;
-            }
+        // 임시 AI 추천 규격 데이터 예시
+        RecommendationDto recommendation = RecommendationDto.builder()
+            .source("ai")
+            .pick("서울시 청년 월세 지원")
+            .headline("서울시 청년 월세 지원을 먼저 신청해보세요.")
+            .reasons(List.of(
+                RecommendationDto.ReasonDto.builder()
+                    .label("지역")
+                    .value(request.getResidenceRegion() != null ? request.getResidenceRegion() : "서울특별시")
+                    .note("지원 대상 지역 요건 충족")
+                    .build(),
+                RecommendationDto.ReasonDto.builder()
+                    .label("소득")
+                    .value("월 소득 요건")
+                    .note("중위소득 범위 내 해당")
+                    .build()
+            ))
+            .alternative("버팀목 전세자금대출은 보증금이 모인 후 신청하는 것이 유리합니다.")
+            .build();
 
-            YouthPolicy policy = YouthPolicy.builder()
-                    .bizId(item.getBizId())
-                    .title(item.getPolyBizSjnm())
-                    .summary(item.getPolyItcnCn())
-                    .ageInfo(item.getAgeInfo())
-                    .applyUrl(item.getRqutUrla())
-                    .build();
-
-            youthPolicyRepository.save(policy);
-            savedCount++;
-        }
-
-        return savedCount;
-    }
-
-    @Transactional(readOnly = true)
-    public PolicyResponse getRecommendedPolicy(PolicyRequest request) {
-        List<YouthPolicy> dbPolicies = youthPolicyRepository.findAll();
-        List<PolicyItemDto> items = new ArrayList<>();
-
-        if (!dbPolicies.isEmpty()) {
-            int limit = Math.min(dbPolicies.size(), 4); // 최대 4개 추천
-            for (int i = 0; i < limit; i++) {
-                YouthPolicy p = dbPolicies.get(i);
-                
-                // summary 25자 이내 처리
-                String rawSummary = p.getSummary() != null ? p.getSummary() : "청년 주거 지원 정책입니다.";
-                String desc = rawSummary.length() > 25 ? rawSummary.substring(0, 22) + "..." : rawSummary;
-
-                items.add(PolicyItemDto.builder()
-                        .policyId(p.getBizId())
-                        .policyName(p.getTitle())
-                        .description(desc)
-                        .eligibility(p.getAgeInfo() != null ? p.getAgeInfo() : "만 19~34세 대상")
-                        .status("신청 가능")
-                        .link(p.getApplyUrl())
-                        .build());
-            }
-        } else {
-            // DB 데이터가 없는 경우 Mock 목록 2개 구성
-            items.add(PolicyItemDto.builder()
-                    .policyId("jeonse-loan")
-                    .policyName("청년 버팀목 전세자금대출")
-                    .description("최대 1.2억원 대출 가능")
-                    .eligibility("만 19~34세 / 연소득 5천만원 이하")
-                    .status("신청 가능")
-                    .link("https://nhuf.molit.go.kr/")
-                    .build());
-
-            items.add(PolicyItemDto.builder()
-                    .policyId("monthly-rent")
-                    .policyName("서울시 청년 월세 지원")
-                    .description("월 최대 20만원 × 12개월")
-                    .eligibility("만 19~39세 / 중위소득 150% 이하")
-                    .status("조건 확인 필요")
-                    .link("https://youth.seoul.go.kr/")
-                    .build());
-        }
-
-        String aiReason = "현재 연령·소득 조건 및 자취 목표를 종합 고려할 때 맞춤 정책을 우선 신청하는 것이 유리합니다.";
-        return new PolicyResponse(items, aiReason);
+        return PolicyResponse.builder()
+            .policies(fallbackPolicies)
+            .recommendation(recommendation)
+            .build();
     }
 }
