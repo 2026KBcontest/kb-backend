@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 public class SignupRequest {
 
     @NotBlank
-    @Pattern(regexp = "^[a-zA-Z]{4,20}$", message = "아이디는 영문 대소문자 4~20자여야 합니다.")
+    @Pattern(regexp = "^[a-zA-Z0-9]{4,20}$", message = "아이디는 영문 대소문자와 숫자 4~20자여야 합니다.")
     private String loginId;
 
     @NotBlank

@@ -10,6 +10,7 @@ import com.moveout.kb_backend.forecast.entity.HousingType;
 import com.moveout.kb_backend.forecast.region.RegionHousingFee;
 import com.moveout.kb_backend.forecast.region.RegionHousingFeeLoader;
 import com.moveout.kb_backend.forecast.repository.SimulationResultRepository;
+import com.moveout.kb_backend.mydata.entity.MyDataSnapshot;
 import com.moveout.kb_backend.mydata.repository.MyDataSnapshotRepository;
 import com.moveout.kb_backend.user.entity.User;
 import com.moveout.kb_backend.user.repository.UserRepository;
@@ -102,6 +103,23 @@ class ForecastServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo("SIMULATION_002");
+    }
+
+    @Test
+    void 자산스냅샷이_있으면_남은상환금액만_차감한다() {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(regionHousingFeeLoader.find("강북구")).thenReturn(Optional.of(new RegionHousingFee(0L, 100_000L)));
+        when(simulationResultRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        MyDataSnapshot snapshot = new MyDataSnapshot(user);
+        snapshot.updateAsset(1_000_000L, 500_000L, 200_000L, 300_000L, 100_000L);
+        snapshot.updateConsumption(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+        when(myDataSnapshotRepository.findByUser(user)).thenReturn(Optional.of(snapshot));
+
+        var response = forecastService.simulate(user.getId(), requestOf("강북구", HousingType.WOLSE));
+
+        // (1,000,000+500,000+200,000) - 100,000 = 1,600,000  (assetLoan 300,000은 차감 안 됨)
+        assertThat(response.currentAsset()).isEqualTo(1_600_000L);
     }
 
     private SetGoalRequest requestOf(String region, HousingType housingType) {

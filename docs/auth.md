@@ -65,7 +65,7 @@ principal로 심어두고, 각 컨트롤러는 `Authentication.getPrincipal()`�
 ### 필드 검증 규칙 (`SignupRequest`)
 | 필드 | 규칙 |
 |---|---|
-| `loginId` | `^[a-zA-Z]{4,20}$` — 영문 대소문자만, 4~20자 (숫자/특수문자/공백 불가) |
+| `loginId` | `^[a-zA-Z0-9]{4,20}$` — 영문 대소문자와 숫자, 4~20자 (특수문자/공백 불가) |
 | `password` | 10~22자 + 특수문자 최소 1개 포함 (`@Size` + 정규식 `.*[^a-zA-Z0-9].*`) |
 | `email` | `@Email` 표준 이메일 형식 |
 | `name` | `@NotBlank` |

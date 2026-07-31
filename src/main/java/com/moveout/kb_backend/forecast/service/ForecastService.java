@@ -134,7 +134,7 @@ public class ForecastService {
         }
         MyDataSnapshot s = snapshot.get();
         return (s.getAssetDeposit() + s.getAssetSaving() + s.getAssetInvestment())
-                - (s.getAssetLoan() + s.getAssetRemainingRepayment());
+                - s.getAssetRemainingRepayment();
     }
 
     private long calculateTotalConsumption(MyDataSnapshot s) {

@@ -7,7 +7,7 @@ Instruction: Auth 모듈 구현 지침
    2-1. User 엔티티
    필드	타입	제약
    id (PK)	UUID	회원가입 시 무작위 생성, 로그인 아이디와 별개
-   loginId	String	필수, UNIQUE, 4~20자, 영문 대소문자만 (숫자/특수문자 불가)
+   loginId	String	필수, UNIQUE, 4~20자, 영문 대소문자와 숫자 (특수문자 불가)
    password	String	필수, BCrypt 해시 저장. 원문 규칙: 10~22자, 특수문자 최소 1개 포함
    email	String	필수, UNIQUE
    name	String	필수
@@ -60,7 +60,7 @@ errorCode는 도메인별 접두어 + 일련번호 규칙으로 관리 (예: AUT
 성공 응답도 동일하게 success: true 필드를 포함하는 통일된 wrapper 구조를 사용할 것 (예: { "success": true, "data": {...} })
 6. 필드 유효성 규칙 요약
    필드	규칙
-   loginId	4~20자, 영문 대소문자만 (숫자·특수문자·공백 불가)
+   loginId	4~20자, 영문 대소문자와 숫자 (특수문자·공백 불가)
    password	10~22자, 특수문자 최소 1개 포함
    email	이메일 형식 검증 필요 (형식 규칙은 표준 이메일 정규식 사용)
 7. 구현 범위에서 제외되는 것 (확인된 사항)
