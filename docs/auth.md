@@ -51,6 +51,13 @@
 principal로 심어두고, 각 컨트롤러는 `Authentication.getPrincipal()`로 그 값을 꺼내 쓴다
 (`mydata`/`user`/`forecast` 모듈이 전부 이 방식).
 
+토큰이 없거나 무효하거나 만료된 경우, 필터는 인증을 설정하지 않고 실패 원인을 request
+attribute(`JwtAuthenticationFilter.ERROR_CODE_ATTRIBUTE`)에 남긴 채 다음 필터로 넘어간다.
+`.anyRequest().authenticated()`에서 걸리면 `SecurityConfig`에 등록된 `AuthenticationEntryPoint`가
+그 attribute를 읽어 `401` + `{success:false, errorCode, message, timestamp}`를 응답한다
+(만료는 `AUTH_005`, 그 외 무효/누락은 `AUTH_004`). 이 경로는 필터 단계에서 처리되므로
+`GlobalExceptionHandler`(전부 `400` 고정)를 거치지 않는 유일한 예외.
+
 ## API
 
 | Method | Path | 인증 | 설명 |
@@ -69,16 +76,23 @@ principal로 심어두고, 각 컨트롤러는 `Authentication.getPrincipal()`�
 | `password` | 10~22자 + 특수문자 최소 1개 포함 (`@Size` + 정규식 `.*[^a-zA-Z0-9].*`) |
 | `email` | `@Email` 표준 이메일 형식 |
 | `name` | `@NotBlank` |
+| `birthDate` | `@NotNull @Past` — `YYYY-MM-DD` |
+| `gender` | `@NotNull` — enum `"남성"` \| `"여성"` |
+| `job` | `@NotNull` — enum `"학생"` \| `"무직"` \| `"직장인"` |
+| `residenceRegion` | `@NotBlank` — 시·도 문자열, 화이트리스트 없음 (예: `"서울특별시"`) |
+| `phone` | `@NotBlank` + `^010-\d{4}-\d{4}$` |
 
-**에러 코드** (형식: `{success:false, errorCode, message, timestamp}`, `GlobalExceptionHandler`가
-`BusinessException`을 이 형식으로 변환)
+**에러 코드** (형식: `{success:false, errorCode, message, timestamp}`. `AUTH_001`~`AUTH_003`,
+`COMMON_001`은 `GlobalExceptionHandler`가 `BusinessException`을 `400`으로 변환한 것이고,
+`AUTH_004`/`AUTH_005`는 `SecurityConfig`의 `AuthenticationEntryPoint`가 `401`로 직접 응답)
 
 | 코드 | 상황 |
 |---|---|
 | `AUTH_001` | loginId 중복 |
 | `AUTH_002` | email 중복 |
 | `AUTH_003` | 로그인 실패 (아이디 없음 또는 비밀번호 불일치, 동일 코드) |
-| `AUTH_004` | reissue 시 refresh token이 무효(서명/만료/불일치) |
+| `AUTH_004` | 토큰 무효(서명/형식 오류, 없음) 또는 reissue 시 refresh token 불일치 — `401` |
+| `AUTH_005` | access token 만료 — `401` |
 | `COMMON_001` | Bean Validation 실패 (형식 검증, `MethodArgumentNotValidException`) |
 
 ## JWT 정책
@@ -101,6 +115,11 @@ User (user 테이블)
   password NOT NULL (BCrypt 해시)
   email    UNIQUE, NOT NULL
   name     NOT NULL
+  birthDate NOT NULL
+  gender    NOT NULL (enum: 남성/여성)
+  job       NOT NULL (enum: 학생/무직/직장인)
+  residenceRegion NOT NULL
+  phone     NOT NULL
   monthlyIncome  nullable  (회원가입 시 입력 안 함 — PATCH /api/users/me/income 으로 별도 설정)
   refreshToken   nullable  (로그인 시 갱신)
   createdAt / updatedAt   (BaseTimeEntity, @CreatedDate/@LastModifiedDate 자동 관리)

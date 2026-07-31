@@ -11,6 +11,11 @@ Instruction: Auth 모듈 구현 지침
    password	String	필수, BCrypt 해시 저장. 원문 규칙: 10~22자, 특수문자 최소 1개 포함
    email	String	필수, UNIQUE
    name	String	필수
+   birthDate	LocalDate	필수, YYYY-MM-DD, 과거 날짜
+   gender	Gender(enum)	필수, 남성/여성
+   job	Job(enum)	필수, 학생/무직/직장인
+   residenceRegion	String	필수, 시·도 문자열(예: 서울특별시)
+   phone	String	필수, 010-XXXX-XXXX 형식
    monthlyIncome	Long	nullable. 회원가입 시점에는 입력받지 않음 — 별도 "데이터 연동" 화면에서 입력
    createdAt	DateTime	자동 생성
    updatedAt	DateTime	자동 갱신
@@ -30,7 +35,7 @@ User와 1:1 관계.
    연동 API 호출 시마다 기존 스냅샷을 덮어쓴다 (upsert).
 4. 인증 흐름
    4-1. 회원가입
-   필수값: loginId, password, email, name (전부 필수, 하나라도 누락 시 에러)
+   필수값: loginId, password, email, name, birthDate, gender, job, residenceRegion, phone (전부 필수, 하나라도 누락 시 에러)
    유효성 검증 순서: 형식 검증(길이/문자규칙) → loginId 중복확인 → email 중복확인
    password는 BCrypt로 해시하여 저장, 원문은 저장하지 않음
    성공 시 UUID(PK) 자동 발급
@@ -63,6 +68,11 @@ errorCode는 도메인별 접두어 + 일련번호 규칙으로 관리 (예: AUT
    loginId	4~20자, 영문 대소문자와 숫자 (특수문자·공백 불가)
    password	10~22자, 특수문자 최소 1개 포함
    email	이메일 형식 검증 필요 (형식 규칙은 표준 이메일 정규식 사용)
+   birthDate	과거 날짜 (YYYY-MM-DD)
+   gender	남성/여성 중 하나
+   job	학생/무직/직장인 중 하나
+   residenceRegion	빈 값 불가 (화이트리스트 검증 없음)
+   phone	010-XXXX-XXXX 형식
 7. 구현 범위에서 제외되는 것 (확인된 사항)
    마이데이터는 프론트 입력이 아닌 백엔드 자체 mock 생성 — 외부 API 연동 로직 불필요 (현 단계)
    회원가입 시 월 평균 소득 입력 없음 — 별도 API로 분리

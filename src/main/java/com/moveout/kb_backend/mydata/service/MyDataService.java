@@ -64,6 +64,19 @@ public class MyDataService {
         return MyDataSnapshotResponse.from(snapshot);
     }
 
+    @Transactional(readOnly = true)
+    public MyDataSnapshotResponse getSnapshot(UUID userId) {
+        User user = userRepository
+                .findById(userId)
+                .orElseThrow(() -> new BusinessException("MYDATA_001", "존재하지 않는 사용자입니다."));
+
+        MyDataSnapshot snapshot = myDataSnapshotRepository
+                .findByUser(user)
+                .orElseThrow(() -> new BusinessException("MYDATA_002", "마이데이터 연동 내역이 없습니다."));
+
+        return MyDataSnapshotResponse.from(snapshot);
+    }
+
     private MyDataMock loadMock() {
         try {
             return objectMapper.readValue(new ClassPathResource(MOCK_FILE_PATH).getInputStream(), MyDataMock.class);

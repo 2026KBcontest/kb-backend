@@ -6,6 +6,9 @@
 - 인증이 필요한 API는 `Authorization: Bearer {accessToken}` 헤더 필요
   (`/api/auth/signup`, `/api/auth/login`, `/api/auth/reissue`, `/api/policy/**` 제외 전부 인증 필요)
 - 에러 응답 공통 포맷: `{ "success": false, "errorCode": "...", "message": "...", "timestamp": "..." }`
+- 인증 실패(토큰 없음/무효/만료)는 `401`로 응답하며 위와 동일한 포맷을 그대로 사용한다
+  (`AUTH_004`/`AUTH_005`, `JwtAuthenticationFilter` + `SecurityConfig`의 `AuthenticationEntryPoint`가 처리 —
+  그 외 `BusinessException`은 전부 `GlobalExceptionHandler`가 `400`으로 응답)
 - 금액 단위는 전부 원(KRW), 정수(Long)
 
 | Method | Path | 인증 | 모듈 |
@@ -13,8 +16,11 @@
 | POST | `/api/auth/signup` | 불필요 | auth |
 | POST | `/api/auth/login` | 불필요 | auth |
 | POST | `/api/auth/reissue` | 불필요 (Refresh-Token 헤더) | auth |
+| GET | `/api/users/me` | 필요 | user |
 | PATCH | `/api/users/me/income` | 필요 | user |
+| GET | `/api/mydata` | 필요 | mydata |
 | POST | `/api/mydata/sync` | 필요 | mydata |
+| GET | `/api/forecast` | 필요 | forecast |
 | POST | `/api/forecast/simulate` | 필요 | forecast |
 
 ---
@@ -30,12 +36,22 @@
   "loginId": "testUser",
   "password": "abcdefg!123",
   "email": "test@example.com",
-  "name": "홍길동"
+  "name": "홍길동",
+  "birthDate": "1998-01-01",
+  "gender": "남성",
+  "job": "직장인",
+  "residenceRegion": "서울특별시",
+  "phone": "010-1234-5678"
 }
 ```
 - `loginId`: 영문 대소문자와 숫자 4~20자
 - `password`: 10~22자 + 특수문자 1개 이상
 - `email`: 표준 이메일 형식
+- `birthDate`: `YYYY-MM-DD`, 과거 날짜
+- `gender`: `"남성"` | `"여성"`
+- `job`: `"학생"` | `"무직"` | `"직장인"`
+- `residenceRegion`: 시·도 문자열 (예: `"서울특별시"`) — forecast의 `region`(서울 25개구), policy의 `region`(시·도)과 이름이 겹치지 않도록 의도적으로 `residenceRegion`으로 명명
+- `phone`: `010-XXXX-XXXX` 형식만 허용
 
 **Response 200**
 ```json
@@ -93,6 +109,23 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...(새 access token)
 
 ## user
 
+### `GET /api/users/me`
+로그인한 사용자 정보 조회 (홈 화면 인사말·소득 표시용, 새로고침해도 값이 유지되도록).
+
+**Response 200**
+```json
+{
+  "loginId": "testUser",
+  "name": "홍길동",
+  "email": "test@example.com",
+  "monthlyIncome": 3000000
+}
+```
+
+**에러**: `USER_001`(토큰의 userId에 해당하는 사용자가 없는 경우 — 방어적 체크)
+
+---
+
 ### `PATCH /api/users/me/income`
 로그인한 사용자의 월평균소득을 설정/수정. 응답 바디 없음(200만 반환).
 
@@ -109,6 +142,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...(새 access token)
 ---
 
 ## mydata
+
+### `GET /api/mydata`
+가장 최근 마이데이터 스냅샷 조회(연동 실행 없이 읽기만). 응답 형식은 `POST /sync`와 동일.
+
+**에러**: `MYDATA_001`(사용자 없음 — 방어적 체크), `MYDATA_002`(아직 연동 이력이 없음 — `sync`를 먼저 호출해야 함)
+
+---
 
 ### `POST /api/mydata/sync`
 마이데이터 연동(mock). 매 호출마다 고정 mock 파일(`mock/mydata-mock.json`) 값을 그대로
@@ -141,6 +181,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...(새 access token)
 ---
 
 ## forecast
+
+### `GET /api/forecast`
+가장 최근 시뮬레이션 결과 조회(재계산 없이 읽기만). 응답 형식은 `POST /simulate`와 동일.
+
+**에러**: `SIMULATION_004`(아직 저장된 시뮬레이션 결과가 없음 — `simulate`를 먼저 호출해야 함)
+
+---
 
 ### `POST /api/forecast/simulate`
 자취 목표(지역/계약방식) 기준 필요금액 산출 + 자취 시작 가능 시점 예측. 결과는 사용자당
@@ -199,10 +246,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...(새 access token)
 | `AUTH_001` | auth | loginId 중복 |
 | `AUTH_002` | auth | email 중복 |
 | `AUTH_003` | auth | 로그인 실패 |
-| `AUTH_004` | auth | refresh token 무효 |
+| `AUTH_004` | auth | 토큰 무효(서명 오류/형식 오류/없음) 또는 refresh token 불일치 — `401` |
+| `AUTH_005` | auth | access token 만료 — `401` |
 | `USER_001` | user | 사용자 없음 |
 | `MYDATA_001` | mydata | 사용자 없음 |
+| `MYDATA_002` | mydata | 마이데이터 연동 이력 없음 |
 | `SIMULATION_001` | forecast | 지원하지 않는 지역 |
 | `SIMULATION_002` | forecast | 소득 정보 없음 |
 | `SIMULATION_003` | forecast | 사용자 없음 |
+| `SIMULATION_004` | forecast | 저장된 시뮬레이션 결과 없음 |
 | `COMMON_001` | 공통 | 요청 값 형식 검증 실패 |

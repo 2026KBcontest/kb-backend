@@ -1,6 +1,7 @@
 package com.moveout.kb_backend.user.service;
 
 import com.moveout.kb_backend.common.exception.BusinessException;
+import com.moveout.kb_backend.user.dto.UserMeResponse;
 import com.moveout.kb_backend.user.entity.User;
 import com.moveout.kb_backend.user.repository.UserRepository;
 import java.util.UUID;
@@ -20,5 +21,13 @@ public class UserService {
                 .findById(userId)
                 .orElseThrow(() -> new BusinessException("USER_001", "존재하지 않는 사용자입니다."));
         user.updateMonthlyIncome(monthlyIncome);
+    }
+
+    @Transactional(readOnly = true)
+    public UserMeResponse getMe(UUID userId) {
+        User user = userRepository
+                .findById(userId)
+                .orElseThrow(() -> new BusinessException("USER_001", "존재하지 않는 사용자입니다."));
+        return UserMeResponse.from(user);
     }
 }

@@ -30,11 +30,17 @@ public class AuthService {
             throw new BusinessException("AUTH_002", "이미 존재하는 이메일입니다.");
         }
 
-        User user = new User(
-                request.getLoginId(),
-                passwordEncoder.encode(request.getPassword()),
-                request.getEmail(),
-                request.getName());
+        User user = User.builder()
+                .loginId(request.getLoginId())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .email(request.getEmail())
+                .name(request.getName())
+                .birthDate(request.getBirthDate())
+                .gender(request.getGender())
+                .job(request.getJob())
+                .residenceRegion(request.getResidenceRegion())
+                .phone(request.getPhone())
+                .build();
         userRepository.save(user);
 
         return new SignupResponse(user.getId(), "회원가입이 완료되었습니다.");
