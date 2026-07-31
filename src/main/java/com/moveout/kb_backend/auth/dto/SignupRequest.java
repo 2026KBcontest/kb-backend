@@ -2,6 +2,7 @@ package com.moveout.kb_backend.auth.dto;
 
 import com.moveout.kb_backend.user.entity.Gender;
 import com.moveout.kb_backend.user.entity.Job;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -50,4 +51,8 @@ public class SignupRequest {
     @NotBlank
     @Pattern(regexp = "^010-\\d{4}-\\d{4}$", message = "휴대폰 번호 형식이 올바르지 않습니다. (예: 010-1234-5678)")
     private String phone;
+
+    @NotNull
+    @Valid
+    private AgreementsRequest agreements;
 }

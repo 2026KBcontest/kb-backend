@@ -89,4 +89,39 @@ public class User extends BaseTimeEntity {
     public void updateMonthlyIncome(Long monthlyIncome) {
         this.monthlyIncome = monthlyIncome;
     }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    public void updateProfile(
+            String name,
+            String email,
+            LocalDate birthDate,
+            String residenceRegion,
+            Gender gender,
+            Job job,
+            String phone) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (email != null) {
+            this.email = email;
+        }
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+        if (residenceRegion != null) {
+            this.residenceRegion = residenceRegion;
+        }
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (job != null) {
+            this.job = job;
+        }
+        if (phone != null) {
+            this.phone = phone;
+        }
+    }
 }

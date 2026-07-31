@@ -21,6 +21,14 @@ Instruction: Auth 모듈 구현 지침
    updatedAt	DateTime	자동 갱신
 
 로그인은 loginId + password 조합으로 처리한다. loginId, email 각각 DB 레벨 UNIQUE 제약을 건다.
+회원가입은 만 19~39세만 허용한다(생년월일 기준, 이 범위를 벗어나면 AUTH_006).
+
+2-1-1. UserAgreement 엔티티 (약관 동의)
+User와 1:1 관계, 회원가입 시 함께 생성한다. 현재 상태 1행만 유지(변경 이력 저장 안 함).
+필드	제약
+privacyAgreed / privacyAgreedAt	필수 동의(반드시 true), 동의 시각은 서버가 요청 처리 시점에 기록
+mydataAgreed / mydataAgreedAt	필수 동의(반드시 true), 동의 시각은 서버가 요청 처리 시점에 기록
+marketingAgreed / marketingAgreedAt	선택 동의(true/false 모두 허용)
 
 2-2. MyDataSnapshot 엔티티 (마이데이터 연동 결과)
 사용자당 최신 스냅샷 1개만 유지한다 (재연동 시 기존 레코드 UPDATE, 이력 누적 저장 아님).
@@ -35,8 +43,8 @@ User와 1:1 관계.
    연동 API 호출 시마다 기존 스냅샷을 덮어쓴다 (upsert).
 4. 인증 흐름
    4-1. 회원가입
-   필수값: loginId, password, email, name, birthDate, gender, job, residenceRegion, phone (전부 필수, 하나라도 누락 시 에러)
-   유효성 검증 순서: 형식 검증(길이/문자규칙) → loginId 중복확인 → email 중복확인
+   필수값: loginId, password, email, name, birthDate, gender, job, residenceRegion, phone, agreements(privacyAgreed/mydataAgreed/marketingAgreed) (전부 필수, 하나라도 누락 시 에러)
+   유효성 검증 순서: 형식 검증(길이/문자규칙, agreements 필수 동의 포함) → 나이 범위(만 19~39세) 확인 → loginId 중복확인 → email 중복확인
    password는 BCrypt로 해시하여 저장, 원문은 저장하지 않음
    성공 시 UUID(PK) 자동 발급
    4-2. 로그인
