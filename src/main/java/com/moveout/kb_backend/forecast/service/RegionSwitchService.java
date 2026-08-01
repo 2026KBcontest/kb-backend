@@ -1,5 +1,6 @@
 package com.moveout.kb_backend.forecast.service;
 
+import com.moveout.kb_backend.ai.service.AiPicker;
 import com.moveout.kb_backend.common.exception.BusinessException;
 import com.moveout.kb_backend.forecast.dto.RegionOptionResponse;
 import com.moveout.kb_backend.forecast.entity.HousingType;
@@ -57,6 +58,7 @@ public class RegionSwitchService {
 
     private final SimulationResultRepository simulationResultRepository;
     private final RegionHousingFeeLoader regionHousingFeeLoader;
+    private final AiPicker aiPicker;
 
     @Transactional(readOnly = true)
     public RegionOptionResponse getOptions(UUID userId) {
@@ -155,10 +157,16 @@ public class RegionSwitchService {
             candidates = cheaper.subList(0, Math.min(FALLBACK_SIZE, cheaper.size()));
         }
 
-        RegionOptionResponse.Recommendation recommendation =
-                candidates.isEmpty()
-                        ? alreadyCheapest(currentRegion, pricier, housingType)
-                        : pickByRule(candidates, housingType);
+        RegionOptionResponse.Recommendation recommendation;
+        if (candidates.isEmpty()) {
+            // 옮길 곳이 없으면 AI 를 부를 이유가 없다 (호출 한 번이 곧 비용이다)
+            recommendation = alreadyCheapest(currentRegion, pricier, housingType);
+        } else {
+            // AI 가 고르게 해보고, 실패하면 규칙 기반으로 내려간다
+            RegionOptionResponse.Recommendation byAi =
+                    pickByAi(currentRegion, housingType, currentRequired, currentMonths, candidates);
+            recommendation = byAi != null ? byAi : pickByRule(candidates, housingType);
+        }
 
         return new RegionOptionResponse(current, candidates, recommendation);
     }
@@ -177,6 +185,69 @@ public class RegionSwitchService {
         }
         long remaining = requiredAmount - currentAsset;
         return (int) Math.ceil((double) remaining / capacity);
+    }
+
+    /**
+     * AI 가 후보 중 하나를 고르게 한다.
+     *
+     * <p><b>여기서 AI 가 하는 일</b> — 규칙은 무조건 "가장 많이 아끼는 곳" 을 고르지만,
+     * 그게 늘 좋은 추천은 아니다. 5천만원 아끼자고 생활권을 크게 옮기는 것보다,
+     * 조금 덜 아껴도 지금 목표 시점을 충분히 앞당기는 곳이 나을 수 있다.
+     * 그 판단과 설명이 AI 의 몫이다. 금액과 개월 수는 이미 계산해서 넘겨준다.
+     *
+     * @return 실패하거나 목록 밖을 고르면 null (부르는 쪽이 규칙 기반으로 내려간다)
+     */
+    private RegionOptionResponse.Recommendation pickByAi(
+            String currentRegion,
+            HousingType housingType,
+            long currentRequired,
+            Integer currentMonths,
+            List<RegionOptionResponse.Candidate> candidates) {
+
+        String userBlock =
+                """
+                지금 목표 지역 : %s (%s)
+                필요한 초기 자금 : %,d원
+                지금 계획대로면 자취까지 : %s
+                """
+                        .formatted(
+                                currentRegion,
+                                housingType == HousingType.JEONSE ? "전세" : "월세",
+                                currentRequired,
+                                currentMonths == null ? "계산 불가" : currentMonths + "개월");
+
+        List<String> lines = new ArrayList<>();
+        for (RegionOptionResponse.Candidate c : candidates) {
+            lines.add(
+                    String.format(
+                            "id=%s | 초기 자금 %,d원 (지금보다 %,d원 적음) | 월세 %,d원 (지금보다 %,d원 적음) | 자취까지 %s%s",
+                            c.region(),
+                            c.requiredAmount(),
+                            c.savedAmount(),
+                            c.monthlyRent(),
+                            c.monthlyRentSaved(),
+                            c.estimatedMonths() == null ? "계산 불가" : c.estimatedMonths() + "개월",
+                            c.shortenMonths() != null && c.shortenMonths() > 0
+                                    ? " (" + c.shortenMonths() + "개월 단축)"
+                                    : ""));
+        }
+
+        List<String> ids = candidates.stream().map(RegionOptionResponse.Candidate::region).toList();
+
+        AiPicker.Pick pick =
+                aiPicker.pick(
+                        userBlock,
+                        lines,
+                        ids,
+                        housingType == HousingType.JEONSE
+                                ? "위 지역 중 이 사용자에게 옮겨볼 만한 곳 하나를 고르고, 초기 자금과 자취 시점이 어떻게 달라지는지 설명해주세요."
+                                : "위 지역 중 이 사용자에게 옮겨볼 만한 곳 하나를 고르고, 매달 월세가 얼마나 줄어드는지 설명해주세요.");
+
+        if (pick == null) {
+            return null;
+        }
+        return new RegionOptionResponse.Recommendation(
+                "ai", pick.pickId(), pick.headline(), pick.reasons());
     }
 
     /**

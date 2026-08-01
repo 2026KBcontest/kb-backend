@@ -4,15 +4,21 @@ import com.moveout.kb_backend.policy.dto.PolicyItemDto;
 import com.moveout.kb_backend.policy.dto.PolicyRequest;
 import com.moveout.kb_backend.policy.dto.PolicyResponse;
 import com.moveout.kb_backend.policy.dto.RecommendationDto;
+import com.moveout.kb_backend.ai.service.AiPicker;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class PolicyService {
+
+    private final AiPicker aiPicker;
 
     public PolicyResponse getRecommendedPolicies(PolicyRequest request) {
         // [시연용 Fallback 데이터 4건 확장]
@@ -74,17 +80,99 @@ public class PolicyService {
                 .build();
         }
 
-        // 임시 AI 추천 규격 데이터 예시
-        // [추가] 걸러진 목록 안에서 고른다. 이름을 고정해두면 그 정책이 필터에 걸렸을 때
-        //        목록에 없는 정책을 추천하게 된다.
+        // AI 가 고르게 해보고, 실패하면 규칙 기반으로 내려간다. 화면은 어느 쪽이든 동작한다.
+        RecommendationDto recommendation = recommendByAi(request, age, policies);
+        if (recommendation == null) {
+            recommendation = recommendByRule(request, age, policies);
+        }
+
+        return PolicyResponse.builder()
+            .policies(policies)
+            .recommendation(recommendation)
+            .build();
+    }
+
+    /**
+     * AI 추천.
+     *
+     * <p>정책 목록을 표처럼 적어 프롬프트에 넣고, 그 안에서만 고르게 한다.
+     * 지원 금액은 우리가 계산한 값을 그대로 적어 보내므로 AI 가 금액을 지어낼 여지가 없다.
+     *
+     * @return 호출 실패하거나 목록 밖을 고르면 null
+     */
+    private RecommendationDto recommendByAi(PolicyRequest request, Integer age, List<PolicyItemDto> policies) {
+        String userBlock = """
+            나이 : %s
+            월 소득 : %s
+            거주 지역 : %s
+            """.formatted(
+                age != null ? "만 " + age + "세" : "확인 필요",
+                request.getIncome() != null ? String.format("%,d원", request.getIncome()) : "확인 필요",
+                request.getResidenceRegion() != null ? request.getResidenceRegion() : "확인 필요");
+
+        List<String> lines = new ArrayList<>();
+        for (PolicyItemDto policy : policies) {
+            lines.add(String.format(
+                "id=%s | %s | %s | 지원금 %s | %s | %s",
+                policy.getPolicyId(),
+                policy.getName(),
+                policy.getCategory(),
+                policy.getSupportAmount() != null
+                    ? String.format("%,d원", policy.getSupportAmount())
+                    : "금액 미정",
+                policy.getSupportNote() != null ? policy.getSupportNote() : "-",
+                policy.getStatus()));
+        }
+
+        List<String> ids = policies.stream().map(PolicyItemDto::getPolicyId).toList();
+
+        AiPicker.Pick pick = aiPicker.pick(
+            userBlock,
+            lines,
+            ids,
+            "위 정책 중 이 사용자가 가장 먼저 확인하면 좋을 것 하나를 고르고, 왜 그런지 설명해주세요.");
+
+        if (pick == null) {
+            return null;
+        }
+
+        // pickId 는 policyId 인데 화면에는 이름이 나가야 한다
+        String pickName = policies.stream()
+            .filter(policy -> policy.getPolicyId().equals(pick.pickId()))
+            .map(PolicyItemDto::getName)
+            .findFirst()
+            .orElse(pick.pickId());
+
+        String altName = pick.altId() == null ? null : policies.stream()
+            .filter(policy -> policy.getPolicyId().equals(pick.altId()))
+            .map(PolicyItemDto::getName)
+            .findFirst()
+            .orElse(null);
+
+        // AI 가 쓴 이유 문장은 label/value 로 나눌 수 없어 note 에만 담는다
+        List<RecommendationDto.ReasonDto> reasons = pick.reasons().stream()
+            .map(text -> RecommendationDto.ReasonDto.builder().note(text).build())
+            .toList();
+
+        return RecommendationDto.builder()
+            .source("ai")
+            .pick(pickName)
+            .headline(pick.headline())
+            .reasons(reasons)
+            .alternative(altName != null ? altName + "도 함께 확인해보세요." : null)
+            .build();
+    }
+
+    /** AI 가 없을 때 쓰는 추천. source 를 "rule" 로 정직하게 표기한다. */
+    private RecommendationDto recommendByRule(PolicyRequest request, Integer age, List<PolicyItemDto> policies) {
+        // 걸러진 목록 안에서 고른다. 이름을 고정해두면 그 정책이 필터에 걸렸을 때
+        // 목록에 없는 정책을 추천하게 된다.
         PolicyItemDto best = policies.stream()
             .filter(policy -> "신청 가능".equals(policy.getStatus()))
             .findFirst()
             .orElse(policies.get(0));
 
-        RecommendationDto recommendation = RecommendationDto.builder()
-            // [수정] "ai" → "rule". 아직 AI 를 호출하지 않는데 "ai" 라고 주면
-            //        화면에 'AI 분석' 배지가 잘못 붙는다. 연동이 끝나면 "ai" 로 되돌린다.
+        return RecommendationDto.builder()
             .source("rule")
             .pick(best.getName())
             .headline(best.getName() + "을(를) 먼저 확인해보세요.")
@@ -104,11 +192,6 @@ public class PolicyService {
             .alternative(policies.size() > 1
                 ? policies.get(1).getName() + "도 함께 확인해보세요. 소득 기준은 신청 시 확인이 필요합니다."
                 : "소득 기준은 정책마다 달라 신청 시 확인이 필요합니다.")
-            .build();
-
-        return PolicyResponse.builder()
-            .policies(policies)
-            .recommendation(recommendation)
             .build();
     }
 
