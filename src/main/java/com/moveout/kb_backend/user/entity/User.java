@@ -51,7 +51,22 @@ public class User extends BaseTimeEntity {
 
     private Long monthlyIncome;
 
+    /**
+     * 사용자가 스스로 정한 월 저축 목표 (원).
+     *
+     * <p>SimulationResult 의 monthlySavingCapacity(소득 - 지출)와는 다른 값이다.
+     * capacity 는 계산된 최대치이고, 이 값은 실제로 모으기로 한 금액이라
+     * 보통 capacity 보다 낮게 잡는다. 화면은 이 값을 기준으로 자취 시점을 다시 계산한다.
+     */
+    private Long monthlySavingGoal;
+
     private String refreshToken;
+
+    private Long assets;
+
+    @Column(nullable = false)
+    private String desiredRegion;
+
 
     public User(String loginId, String password, String email, String name) {
         this.loginId = loginId;
@@ -101,7 +116,8 @@ public class User extends BaseTimeEntity {
             String residenceRegion,
             Gender gender,
             Job job,
-            String phone) {
+            String phone,
+            Long monthlySavingGoal) {
         if (name != null) {
             this.name = name;
         }
@@ -122,6 +138,9 @@ public class User extends BaseTimeEntity {
         }
         if (phone != null) {
             this.phone = phone;
+        }
+        if (monthlySavingGoal != null) {
+            this.monthlySavingGoal = monthlySavingGoal;
         }
     }
 }

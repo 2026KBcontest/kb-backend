@@ -60,7 +60,8 @@ public class UserService {
                 request.getResidenceRegion(),
                 request.getGender(),
                 request.getJob(),
-                request.getPhone());
+                request.getPhone(),
+                request.getMonthlySavingGoal());
 
         return UserMeResponse.from(user);
     }

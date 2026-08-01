@@ -2,6 +2,9 @@ HELP.md
 .gradle
 build/
 .env
+
+# 로컬 실행 스크립트 (환경변수·비밀번호가 들어 있어 공유하지 않음)
+run-local.ps1
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

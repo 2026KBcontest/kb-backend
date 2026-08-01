@@ -95,11 +95,26 @@ class UserServiceTest {
     void updateProfile_보낸_필드만_반영한다() {
         User user = user();
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        UpdateProfileRequest request = new UpdateProfileRequest(null, null, null, "부산광역시", null, null, null);
+        UpdateProfileRequest request =
+                new UpdateProfileRequest(null, null, null, "부산광역시", null, null, null, null);
 
         var response = userService.updateProfile(user.getId(), request);
 
         assertThat(response.residenceRegion()).isEqualTo("부산광역시");
+        assertThat(response.name()).isEqualTo("홍길동");
+    }
+
+    @Test
+    void updateProfile_월_저축_목표를_저장한다() {
+        User user = user();
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        UpdateProfileRequest request =
+                new UpdateProfileRequest(null, null, null, null, null, null, null, 540000L);
+
+        var response = userService.updateProfile(user.getId(), request);
+
+        assertThat(response.monthlySavingGoal()).isEqualTo(540000L);
+        // 보내지 않은 필드는 그대로여야 한다
         assertThat(response.name()).isEqualTo("홍길동");
     }
 
@@ -109,7 +124,7 @@ class UserServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
         UpdateProfileRequest request =
-                new UpdateProfileRequest(null, "taken@example.com", null, null, null, null, null);
+                new UpdateProfileRequest(null, "taken@example.com", null, null, null, null, null, null);
 
         BusinessException e = (BusinessException) org.assertj.core.api.Assertions
                 .catchThrowable(() -> userService.updateProfile(user.getId(), request));
