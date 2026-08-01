@@ -123,7 +123,9 @@ public class ForecastService {
         return SimulationResultResponse.from(result);
     }
 
-    private long calculateBrokerageFee(long deposit, long monthlyRent) {
+    // RegionSwitchService 도 같은 식으로 계산해야 해서 package-private 으로 연다.
+    // 복사해서 쓰면 한쪽만 고쳤을 때 화면마다 다른 금액이 나온다.
+    static long calculateBrokerageFee(long deposit, long monthlyRent) {
         long baseAmount = deposit + monthlyRent * 100;
         long transactionAmount = baseAmount < BRACKET_LOW ? deposit + monthlyRent * 70 : baseAmount;
 
