@@ -14,22 +14,45 @@ public class ProductController {
 
     @GetMapping
     public ResponseEntity<?> getProducts() {
-        List<Map<String, Object>> mockProducts = List.of(
+        List<Map<String, Object>> productList = List.of(
             Map.of(
-                "id", "prod-1",
+                "productId", "kb-youth-jeonse-loan",
                 "name", "KB 청년 맞춤형 전세자금대출",
                 "category", "LOAN",
-                "maxAmount", 200000000,
-                "interestRate", "2.4%"
+                "tag", "최저 금리",
+                "specs", List.of(
+                    Map.of("label", "최저 금리", "value", "2.40%"),
+                    Map.of("label", "예상 한도", "value", "2억원"),
+                    Map.of("label", "상환 기간", "value", "최대 10년")
+                ),
+                "calc", Map.of(
+                    "maxLimit", 200000000L,
+                    "minRate", 2.4,
+                    "maxRate", 4.1,
+                    "maxYears", 10
+                ),
+                "link", "https://obank.kbstar.com/quics?page=C018020"
             ),
             Map.of(
-                "id", "prod-2",
-                "name", "KB 청년 도약 적금",
+                "productId", "kb-youth-doyak-savings",
+                "name", "KB 청년도약계좌",
                 "category", "SAVINGS",
-                "maxAmount", 700000,
-                "interestRate", "6.0%"
+                "tag", "청년 우대",
+                "specs", List.of(
+                    Map.of("label", "최고 금리", "value", "6.00%"),
+                    Map.of("label", "월 납입한도", "value", "70만원"),
+                    Map.of("label", "가입 기간", "value", "5년")
+                ),
+                "calc", Map.of(
+                    "maxLimit", 700000L,
+                    "minRate", 4.5,
+                    "maxRate", 6.0,
+                    "maxYears", 5
+                ),
+                "link", "https://obank.kbstar.com/quics?page=C018021"
             )
         );
-        return ResponseEntity.ok(mockProducts);
+
+        return ResponseEntity.ok(Map.of("products", productList));
     }
 }

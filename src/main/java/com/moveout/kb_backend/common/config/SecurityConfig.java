@@ -1,4 +1,4 @@
-package com.moveout.kb_backend.config;
+package com.moveout.kb_backend.common.config;
 
 import com.moveout.kb_backend.auth.jwt.JwtAuthenticationFilter;
 import com.moveout.kb_backend.common.exception.ErrorResponse;
@@ -73,7 +73,8 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/signup", "/api/auth/login", "/api/auth/reissue", "/api/policy/**")
+                                "/api/auth/signup", "/api/auth/login", "/api/auth/reissue",
+                                "/api/policy/**", "/api/products/**", "/api/ai/**")
                         .permitAll()
                         .anyRequest().authenticated()
                 )

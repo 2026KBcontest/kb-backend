@@ -16,15 +16,7 @@ public class PolicyController {
 
     @PostMapping("/recommend")
     public ResponseEntity<PolicyResponse> getPolicyRecommendation(@RequestBody PolicyRequest request) {
-        PolicyResponse response = policyService.getRecommendedPolicy(request);
+        PolicyResponse response = policyService.getRecommendedPolicies(request);
         return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/sync")
-    public ResponseEntity<String> syncPolicies(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int display) {
-        int count = policyService.syncYouthPoliciesFromApi(page, display);
-        return ResponseEntity.ok("온통청년 정책 " + count + "건 DB 동기화 완료");
     }
 }
