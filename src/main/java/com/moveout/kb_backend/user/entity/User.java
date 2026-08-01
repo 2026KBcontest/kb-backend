@@ -53,6 +53,12 @@ public class User extends BaseTimeEntity {
 
     private String refreshToken;
 
+    private Long assets;
+
+    @Column(nullable = false)
+    private String desiredRegion;
+
+
     public User(String loginId, String password, String email, String name) {
         this.loginId = loginId;
         this.password = password;
@@ -62,15 +68,18 @@ public class User extends BaseTimeEntity {
 
     @Builder
     public User(
-            String loginId,
-            String password,
-            String email,
-            String name,
-            LocalDate birthDate,
-            Gender gender,
-            Job job,
-            String residenceRegion,
-            String phone) {
+        String loginId,
+        String password,
+        String email,
+        String name,
+        LocalDate birthDate,
+        Gender gender,
+        Job job,
+        String residenceRegion,
+        String phone,
+        Long monthlyIncome,
+        Long assets,
+        String desiredRegion) {
         this.loginId = loginId;
         this.password = password;
         this.email = email;
@@ -80,6 +89,9 @@ public class User extends BaseTimeEntity {
         this.job = job;
         this.residenceRegion = residenceRegion;
         this.phone = phone;
+        this.monthlyIncome = monthlyIncome;
+        this.assets = assets;
+        this.desiredRegion = desiredRegion;
     }
 
     public void updateRefreshToken(String refreshToken) {
@@ -101,7 +113,10 @@ public class User extends BaseTimeEntity {
             String residenceRegion,
             Gender gender,
             Job job,
-            String phone) {
+            String phone,
+            Long monthlyIncome,
+            Long assets,
+            String desiredRegion) {
         if (name != null) {
             this.name = name;
         }
@@ -122,6 +137,15 @@ public class User extends BaseTimeEntity {
         }
         if (phone != null) {
             this.phone = phone;
+        }
+        if (monthlyIncome != null) {
+            this.monthlyIncome = monthlyIncome;
+        }
+        if (assets != null) {
+            this.assets = assets;
+        }
+        if (desiredRegion != null) {
+            this.desiredRegion = desiredRegion;
         }
     }
 }
