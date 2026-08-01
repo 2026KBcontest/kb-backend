@@ -7,9 +7,11 @@ import static org.mockito.Mockito.when;
 import com.moveout.kb_backend.common.exception.BusinessException;
 import com.moveout.kb_backend.forecast.dto.SetGoalRequest;
 import com.moveout.kb_backend.forecast.entity.HousingType;
+import com.moveout.kb_backend.forecast.entity.SimulationResult;
 import com.moveout.kb_backend.forecast.region.RegionHousingFee;
 import com.moveout.kb_backend.forecast.region.RegionHousingFeeLoader;
 import com.moveout.kb_backend.forecast.repository.SimulationResultRepository;
+import com.moveout.kb_backend.mydata.entity.MyDataSnapshot;
 import com.moveout.kb_backend.mydata.repository.MyDataSnapshotRepository;
 import com.moveout.kb_backend.user.entity.User;
 import com.moveout.kb_backend.user.repository.UserRepository;
@@ -102,6 +104,46 @@ class ForecastServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo("SIMULATION_002");
+    }
+
+    @Test
+    void 자산스냅샷이_있으면_남은상환금액만_차감한다() {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(regionHousingFeeLoader.find("강북구")).thenReturn(Optional.of(new RegionHousingFee(0L, 100_000L)));
+        when(simulationResultRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        MyDataSnapshot snapshot = new MyDataSnapshot(user);
+        snapshot.updateAsset(1_000_000L, 500_000L, 200_000L, 300_000L, 100_000L);
+        snapshot.updateConsumption(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+        when(myDataSnapshotRepository.findByUser(user)).thenReturn(Optional.of(snapshot));
+
+        var response = forecastService.simulate(user.getId(), requestOf("강북구", HousingType.WOLSE));
+
+        // (1,000,000+500,000+200,000) - 100,000 = 1,600,000  (assetLoan 300,000은 차감 안 됨)
+        assertThat(response.currentAsset()).isEqualTo(1_600_000L);
+    }
+
+    @Test
+    void getResult_저장된_결과가_있으면_반환한다() {
+        SimulationResult result = new SimulationResult(user);
+        result.update(
+                "강북구", HousingType.WOLSE, 10_000_000L, 100_000L, 85_000L, 10_285_000L, 0L, 600_000L, true, 18,
+                java.time.LocalDate.now().plusMonths(18));
+        when(simulationResultRepository.findById(user.getId())).thenReturn(Optional.of(result));
+
+        var response = forecastService.getResult(user.getId());
+
+        assertThat(response.region()).isEqualTo("강북구");
+    }
+
+    @Test
+    void getResult_저장된_결과가_없으면_SIMULATION_004() {
+        when(simulationResultRepository.findById(user.getId())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> forecastService.getResult(user.getId()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo("SIMULATION_004");
     }
 
     private SetGoalRequest requestOf(String region, HousingType housingType) {

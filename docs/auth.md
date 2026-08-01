@@ -14,9 +14,11 @@
               ▼
         AuthService.signup()
               ├─ 형식 검증 (Bean Validation: @Pattern/@Size/@Email, 컨트롤러 @Valid 단계에서 선행)
+              ├─ 만 19~39세 범위 확인 (AUTH_006)
               ├─ loginId 중복 확인 (AUTH_001)
               ├─ email 중복 확인 (AUTH_002)
               ├─ 비밀번호 BCrypt 해시 후 User 저장 (id는 UUID.randomUUID()로 즉시 발급)
+              ├─ UserAgreement 저장 (agreedAt은 서버 시각으로 직접 기록, 클라이언트 값 안 받음)
               ▼
         SignupResponse { userId, message }
 
@@ -51,6 +53,13 @@
 principal로 심어두고, 각 컨트롤러는 `Authentication.getPrincipal()`로 그 값을 꺼내 쓴다
 (`mydata`/`user`/`forecast` 모듈이 전부 이 방식).
 
+토큰이 없거나 무효하거나 만료된 경우, 필터는 인증을 설정하지 않고 실패 원인을 request
+attribute(`JwtAuthenticationFilter.ERROR_CODE_ATTRIBUTE`)에 남긴 채 다음 필터로 넘어간다.
+`.anyRequest().authenticated()`에서 걸리면 `SecurityConfig`에 등록된 `AuthenticationEntryPoint`가
+그 attribute를 읽어 `401` + `{success:false, errorCode, message, timestamp}`를 응답한다
+(만료는 `AUTH_005`, 그 외 무효/누락은 `AUTH_004`). 이 경로는 필터 단계에서 처리되므로
+`GlobalExceptionHandler`(전부 `400` 고정)를 거치지 않는 유일한 예외.
+
 ## API
 
 | Method | Path | 인증 | 설명 |
@@ -65,20 +74,32 @@ principal로 심어두고, 각 컨트롤러는 `Authentication.getPrincipal()`�
 ### 필드 검증 규칙 (`SignupRequest`)
 | 필드 | 규칙 |
 |---|---|
-| `loginId` | `^[a-zA-Z]{4,20}$` — 영문 대소문자만, 4~20자 (숫자/특수문자/공백 불가) |
+| `loginId` | `^[a-zA-Z0-9]{4,20}$` — 영문 대소문자와 숫자, 4~20자 (특수문자/공백 불가) |
 | `password` | 10~22자 + 특수문자 최소 1개 포함 (`@Size` + 정규식 `.*[^a-zA-Z0-9].*`) |
 | `email` | `@Email` 표준 이메일 형식 |
 | `name` | `@NotBlank` |
+| `birthDate` | `@NotNull @Past` — `YYYY-MM-DD` |
+| `gender` | `@NotNull` — enum `"남성"` \| `"여성"` |
+| `job` | `@NotNull` — enum `"학생"` \| `"무직"` \| `"직장인"` |
+| `residenceRegion` | `@NotBlank` — 시·도 문자열, 화이트리스트 없음 (예: `"서울특별시"`) |
+| `phone` | `@NotBlank` + `^010-\d{4}-\d{4}$` |
+| `agreements.privacyAgreed` | `@AssertTrue` — 필수 동의, `false`면 검증 실패 |
+| `agreements.mydataAgreed` | `@AssertTrue` — 필수 동의, `false`면 검증 실패 |
+| `agreements.marketingAgreed` | `@NotNull` — 선택 동의, `true`/`false` 모두 허용 |
 
-**에러 코드** (형식: `{success:false, errorCode, message, timestamp}`, `GlobalExceptionHandler`가
-`BusinessException`을 이 형식으로 변환)
+**에러 코드** (형식: `{success:false, errorCode, message, timestamp}`. 기본은 `GlobalExceptionHandler`가
+`BusinessException`을 `400`으로 변환하지만, `BusinessException`에 `HttpStatus`를 실어서 던지면
+그 상태코드로 응답한다 — `AUTH_002`/`AUTH_003`이 그 예. `AUTH_004`/`AUTH_005`는 `GlobalExceptionHandler`를
+거치지 않고 `SecurityConfig`의 `AuthenticationEntryPoint`가 `401`로 직접 응답)
 
 | 코드 | 상황 |
 |---|---|
 | `AUTH_001` | loginId 중복 |
-| `AUTH_002` | email 중복 |
-| `AUTH_003` | 로그인 실패 (아이디 없음 또는 비밀번호 불일치, 동일 코드) |
-| `AUTH_004` | reissue 시 refresh token이 무효(서명/만료/불일치) |
+| `AUTH_002` | email 중복 — 회원가입은 `400`, `PATCH /api/users/me`는 `409` |
+| `AUTH_003` | 로그인 실패는 `400`, `PATCH /api/users/me/password` 현재 비밀번호 불일치는 `401` |
+| `AUTH_004` | 토큰 무효(서명/형식 오류, 없음) 또는 reissue 시 refresh token 불일치 — `401` |
+| `AUTH_005` | access token 만료 — `401` |
+| `AUTH_006` | 회원가입 나이 제한(만 19~39세) 위반 |
 | `COMMON_001` | Bean Validation 실패 (형식 검증, `MethodArgumentNotValidException`) |
 
 ## JWT 정책
@@ -101,14 +122,24 @@ User (user 테이블)
   password NOT NULL (BCrypt 해시)
   email    UNIQUE, NOT NULL
   name     NOT NULL
+  birthDate NOT NULL
+  gender    NOT NULL (enum: 남성/여성)
+  job       NOT NULL (enum: 학생/무직/직장인)
+  residenceRegion NOT NULL
+  phone     NOT NULL
   monthlyIncome  nullable  (회원가입 시 입력 안 함 — PATCH /api/users/me/income 으로 별도 설정)
   refreshToken   nullable  (로그인 시 갱신)
   createdAt / updatedAt   (BaseTimeEntity, @CreatedDate/@LastModifiedDate 자동 관리)
 ```
 
-`auth` 모듈은 이 `User` 테이블 하나만 다룬다. `MyDataSnapshot`(mydata 모듈)과
-`SimulationResult`(forecast 모듈)는 각각 `User`와 1:1로 연결되지만 `auth` 코드에서 직접 참조하지
-않는다.
+`auth` 모듈은 `User`와, 회원가입 시 함께 생성하는 `UserAgreement`(약관 동의, `User`와 1:1,
+`SimulationResult`와 동일한 `@MapsId` 패턴 — PK가 곧 `user_id`) 두 테이블을 다룬다.
+`privacyAgreed`/`mydataAgreed`/`marketingAgreed` 각각 boolean + 동의 시각(agreed가 `true`일 때만
+값 존재, `false`면 `null`) 한 쌍씩 6개 컬럼. **현재 상태만 저장**(변경 이력 테이블 아님) —
+동의를 나중에 바꾸면 같은 행을 덮어쓰고 과거 값은 남지 않는다.
+
+`MyDataSnapshot`(mydata 모듈)과 `SimulationResult`(forecast 모듈)도 각각 `User`와 1:1로 연결되지만
+`auth` 코드에서 직접 참조하지 않는다.
 
 ## 다른 모듈과의 관계
 

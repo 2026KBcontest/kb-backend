@@ -115,6 +115,14 @@ public class ForecastService {
         return SimulationResultResponse.from(result);
     }
 
+    @Transactional(readOnly = true)
+    public SimulationResultResponse getResult(UUID userId) {
+        SimulationResult result = simulationResultRepository
+                .findById(userId)
+                .orElseThrow(() -> new BusinessException("SIMULATION_004", "저장된 시뮬레이션 결과가 없습니다."));
+        return SimulationResultResponse.from(result);
+    }
+
     private long calculateBrokerageFee(long deposit, long monthlyRent) {
         long baseAmount = deposit + monthlyRent * 100;
         long transactionAmount = baseAmount < BRACKET_LOW ? deposit + monthlyRent * 70 : baseAmount;
@@ -134,7 +142,7 @@ public class ForecastService {
         }
         MyDataSnapshot s = snapshot.get();
         return (s.getAssetDeposit() + s.getAssetSaving() + s.getAssetInvestment())
-                - (s.getAssetLoan() + s.getAssetRemainingRepayment());
+                - s.getAssetRemainingRepayment();
     }
 
     private long calculateTotalConsumption(MyDataSnapshot s) {
