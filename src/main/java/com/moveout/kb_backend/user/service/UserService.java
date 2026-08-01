@@ -61,6 +61,11 @@ public class UserService {
                 request.getGender(),
                 request.getJob(),
                 request.getPhone(),
+                // 월 소득은 PATCH /api/users/me/income 에서, 자산·희망지역은 아직 화면이 없어
+                // 프로필 수정으로는 건드리지 않는다. null 이면 기존 값이 유지된다.
+                null,
+                null,
+                null,
                 request.getMonthlySavingGoal());
 
         return UserMeResponse.from(user);
