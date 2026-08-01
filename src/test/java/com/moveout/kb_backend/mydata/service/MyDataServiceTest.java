@@ -53,7 +53,7 @@ class MyDataServiceTest {
     void getSnapshot_연동내역이_있으면_스냅샷을_반환한다() {
         User user = user();
         MyDataSnapshot snapshot = new MyDataSnapshot(user);
-        snapshot.updateAsset(1_000_000L, 500_000L, 200_000L, 300_000L, 100_000L);
+        snapshot.updateAsset(1_000_000L, 500_000L, 200_000L, 300_000L, 100_000L, 50_000L);
         snapshot.updateConsumption(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(myDataSnapshotRepository.findByUser(user)).thenReturn(Optional.of(snapshot));

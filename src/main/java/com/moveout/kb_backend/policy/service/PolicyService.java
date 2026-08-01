@@ -32,6 +32,7 @@ public class PolicyService {
                 .link("https://youth.seoul.go.kr")
                 .supportAmount(2400000)
                 .supportNote("월 20만원 × 12개월")
+                .eligibility("만 19~39세 · 서울 · 무주택")
                 .build(),
             PolicyItemDto.builder()
                 .policyId("youth-jeonse-02")
@@ -42,6 +43,7 @@ public class PolicyService {
                 .link("https://nhuf.molit.go.kr")
                 .supportAmount(null)
                 .supportNote("대출 한도 우대 (최대 2억원)")
+                .eligibility("만 19~34세 · 전국 · 무주택")
                 .build(),
             PolicyItemDto.builder()
                 .policyId("youth-savings-03")
@@ -52,6 +54,7 @@ public class PolicyService {
                 .link("https://kinfa.or.kr")
                 .supportAmount(1440000)
                 .supportNote("최대 월 2.4만원 × 60개월")
+                .eligibility("만 19~34세 · 전국 · 소득 요건 있음")
                 .build(),
             PolicyItemDto.builder()
                 .policyId("youth-transport-04")
@@ -62,6 +65,7 @@ public class PolicyService {
                 .link("https://korea-pass.kr")
                 .supportAmount(360000)
                 .supportNote("월 평균 3만원 환급 기준")
+                .eligibility("만 19~39세 · 전국 · 추가 조건 없음")
                 .build()
         );
 
@@ -70,6 +74,8 @@ public class PolicyService {
         Integer age = calcAge(request.getBirthDate());
         List<PolicyItemDto> policies = fallbackPolicies.stream()
             .filter(policy -> matches(policy, request.getResidenceRegion(), age))
+            // 왜 이 정책이 남았는지를 카드에 적어준다. 걸러낸 근거를 그대로 보여주는 것이다.
+            .map(policy -> withMatchReasons(policy, request.getResidenceRegion(), age))
             .toList();
 
         // 조건 검색 결과가 없을 경우 (404 대신 빈 배열과 null 반환)
@@ -205,6 +211,53 @@ public class PolicyService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * 이 정책이 왜 이 사용자에게 맞는지 한 줄씩 적는다.
+     *
+     * <p>AI 가 지어낸 설명이 아니라 {@link #matches} 가 통과시킨 근거 그대로다.
+     * "왜 나한테 이걸 추천했지?" 는 사용자가 가장 먼저 하는 질문이고,
+     * 답이 없으면 추천 자체를 안 믿게 된다.
+     */
+    private PolicyItemDto withMatchReasons(PolicyItemDto policy, String residenceRegion, Integer age) {
+        /* 카드마다 문장 모양이 다르면 눈이 매번 새로 읽어야 한다.
+           "라벨 — 설명" 한 가지 모양으로 맞추고, 순서도 나이 → 지역 → 신청 상태로 고정한다.
+           대상 조건(eligibility) 도 '나이 · 지역 · 추가 조건' 같은 칸 순서를 쓴다. */
+        List<String> reasons = new ArrayList<>();
+
+        if (age != null) {
+            boolean under34 = "youth-jeonse-02".equals(policy.getPolicyId())
+                || "youth-savings-03".equals(policy.getPolicyId());
+            reasons.add(String.format("만 %d세 — 대상 연령 만 19~%d세에 들어가요", age, under34 ? 34 : 39));
+        }
+
+        if ("youth-rent-01".equals(policy.getPolicyId())) {
+            if (residenceRegion != null) {
+                reasons.add(residenceRegion + " 거주 — 서울시 사업 대상이에요");
+            }
+        } else {
+            reasons.add("전국 대상 — 거주지와 상관없이 신청할 수 있어요");
+        }
+
+        if ("신청 가능".equals(policy.getStatus())) {
+            reasons.add("신청 가능 — 지금 접수 중이에요");
+        } else {
+            reasons.add("조건 확인 필요 — 신청 전에 세부 요건을 확인해주세요");
+        }
+
+        return PolicyItemDto.builder()
+            .policyId(policy.getPolicyId())
+            .name(policy.getName())
+            .category(policy.getCategory())
+            .description(policy.getDescription())
+            .status(policy.getStatus())
+            .link(policy.getLink())
+            .supportAmount(policy.getSupportAmount())
+            .supportNote(policy.getSupportNote())
+            .eligibility(policy.getEligibility())
+            .matchReasons(List.copyOf(reasons))
+            .build();
     }
 
     // [추가] 정책별 신청 요건. 값이 null 이면 그 조건은 건너뛴다(있는 정보로만 거른다).

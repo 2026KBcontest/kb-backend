@@ -43,4 +43,9 @@ public class RegionHousingFeeLoader {
     public Optional<RegionHousingFee> find(String region) {
         return Optional.ofNullable(feesByRegion.get(region));
     }
+
+    /** 지원하는 모든 지역의 시세. 화면에서 지역을 고를 때 미리 보여주는 용도. */
+    public Map<String, RegionHousingFee> findAll() {
+        return Map.copyOf(feesByRegion);
+    }
 }

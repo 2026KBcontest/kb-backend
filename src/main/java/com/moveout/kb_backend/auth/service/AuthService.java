@@ -54,13 +54,18 @@ public class AuthService {
                 .residenceRegion(request.getResidenceRegion())
                 .phone(request.getPhone())
                 .build();
-        userRepository.save(user);
+        /* save() 가 돌려준 인스턴스를 받아서 쓴다.
+           User 는 ID 를 자바에서 만들기 때문에(UUID.randomUUID()) JPA 가 이미 저장된 것으로 보고
+           INSERT 가 아니라 merge 로 처리한다. merge 는 영속 상태인 '새 복사본' 을 돌려주고,
+           우리가 만든 원본 객체는 여전히 비영속 상태로 남는다.
+           그 원본을 UserAgreement 에 넘기면 "저장되지 않은 User 를 참조한다" 며 커밋이 실패한다. */
+        User savedUser = userRepository.save(user);
 
         AgreementsRequest agreements = request.getAgreements();
         userAgreementRepository.save(new UserAgreement(
-                user, agreements.getPrivacyAgreed(), agreements.getMydataAgreed(), agreements.getMarketingAgreed()));
+                savedUser, agreements.getPrivacyAgreed(), agreements.getMydataAgreed(), agreements.getMarketingAgreed()));
 
-        return new SignupResponse(user.getId(), "회원가입이 완료되었습니다.");
+        return new SignupResponse(savedUser.getId(), "회원가입이 완료되었습니다.");
     }
 
     @Transactional

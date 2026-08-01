@@ -74,7 +74,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/signup", "/api/auth/login", "/api/auth/reissue",
-                                "/api/policy/**", "/api/products/**", "/api/ai/**")
+                                "/api/policy/**", "/api/products/**", "/api/ai/**",
+                                // 지역 시세는 공개 정보라 로그인 전에도 볼 수 있게 둔다
+                                "/api/forecast/regions")
                         .permitAll()
                         .anyRequest().authenticated()
                 )

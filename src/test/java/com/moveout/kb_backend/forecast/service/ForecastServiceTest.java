@@ -113,7 +113,7 @@ class ForecastServiceTest {
         when(simulationResultRepository.findById(user.getId())).thenReturn(Optional.empty());
 
         MyDataSnapshot snapshot = new MyDataSnapshot(user);
-        snapshot.updateAsset(1_000_000L, 500_000L, 200_000L, 300_000L, 100_000L);
+        snapshot.updateAsset(1_000_000L, 500_000L, 200_000L, 300_000L, 100_000L, 50_000L);
         snapshot.updateConsumption(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
         when(myDataSnapshotRepository.findByUser(user)).thenReturn(Optional.of(snapshot));
 

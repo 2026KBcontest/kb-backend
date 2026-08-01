@@ -1,9 +1,11 @@
 package com.moveout.kb_backend.forecast.controller;
 
 import com.moveout.kb_backend.forecast.dto.RegionOptionResponse;
+import com.moveout.kb_backend.forecast.dto.RegionPreviewResponse;
 import com.moveout.kb_backend.forecast.dto.SetGoalRequest;
 import com.moveout.kb_backend.forecast.dto.SimulationResultResponse;
 import com.moveout.kb_backend.forecast.service.ForecastService;
+import com.moveout.kb_backend.forecast.service.RegionPreviewService;
 import com.moveout.kb_backend.forecast.service.RegionSwitchService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -22,6 +24,17 @@ public class ForecastController {
 
     private final ForecastService forecastService;
     private final RegionSwitchService regionSwitchService;
+    private final RegionPreviewService regionPreviewService;
+
+    /**
+     * 지역별 시세 미리보기 — 분석을 돌리기 전에 화면에서 보여준다.
+     *
+     * <p>로그인 없이도 볼 수 있어야 한다. 공개된 시세 정보이고, 개인 데이터가 섞이지 않는다.
+     */
+    @GetMapping("/regions")
+    public RegionPreviewResponse getRegions() {
+        return regionPreviewService.getAll();
+    }
 
     @GetMapping
     public SimulationResultResponse getResult(Authentication authentication) {

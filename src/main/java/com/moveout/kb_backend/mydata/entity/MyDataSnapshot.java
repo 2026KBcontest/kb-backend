@@ -45,6 +45,14 @@ public class MyDataSnapshot extends BaseTimeEntity {
     private Long assetLoan;
     private Long assetRemainingRepayment;
 
+    /**
+     * 기존 대출의 매달 상환액 (원금 + 이자).
+     *
+     * <p>DSR 계산에 반드시 필요한 값이다. 이자만 넣고 계산하면 실제보다 낮게 나와서
+     * "빌릴 수 있다" 고 잘못 안내하게 된다.
+     */
+    private Long assetMonthlyRepayment;
+
     public MyDataSnapshot(User user) {
         this.user = user;
     }
@@ -77,11 +85,13 @@ public class MyDataSnapshot extends BaseTimeEntity {
             Long assetSaving,
             Long assetInvestment,
             Long assetLoan,
-            Long assetRemainingRepayment) {
+            Long assetRemainingRepayment,
+            Long assetMonthlyRepayment) {
         this.assetDeposit = assetDeposit;
         this.assetSaving = assetSaving;
         this.assetInvestment = assetInvestment;
         this.assetLoan = assetLoan;
         this.assetRemainingRepayment = assetRemainingRepayment;
+        this.assetMonthlyRepayment = assetMonthlyRepayment;
     }
 }

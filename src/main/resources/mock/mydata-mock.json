@@ -18,6 +18,7 @@
     "saving": 3000000,
     "investment": 10000000,
     "loan": 20000000,
-    "remainingRepayment": 15000000
+    "remainingRepayment": 15000000,
+    "monthlyRepayment": 350000
   }
 }

@@ -59,7 +59,8 @@ public class MyDataService {
 
         MyDataMock.Asset asset = mock.asset();
         snapshot.updateAsset(
-                asset.deposit(), asset.saving(), asset.investment(), asset.loan(), asset.remainingRepayment());
+                asset.deposit(), asset.saving(), asset.investment(), asset.loan(),
+                asset.remainingRepayment(), asset.monthlyRepayment());
 
         return MyDataSnapshotResponse.from(snapshot);
     }
