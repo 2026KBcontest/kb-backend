@@ -30,12 +30,14 @@ public record ProductResponse(List<Item> products, Recommendation recommendation
     public record Spec(String label, String value) {}
 
     /**
-     * @param assumedYears 상환 기간 가정값.
-     *     <p>원본 데이터에 상환 기간이 없어서 DSR 을 계산하려면 기간을 정해야 한다.
+     * @param assumedYears 상환 기간(년).
+     *     <p>원본 데이터에 상환 기간이 없는 상품이 많아서, 없으면 10년으로 가정한다.
      *     지어낸 값을 상품 정보인 척 내보내지 않으려고 이름에 'assumed' 를 박아두고,
-     *     화면에도 "10년 가정" 이라고 표시한다.
+     *     화면 specs 에도 "10년 가정" 이라고 표시한다(적혀 있는 상품은 "1년" 처럼 그대로).
+     *     <p><b>정수가 아닌 이유</b> — 1년 미만인 상품을 표현해야 한다. 6개월이면 0.5 다.
+     *     화면은 이 값에 12를 곱해 개월 수로 쓴다.
      */
-    public record Calc(Long maxLimit, Double minRate, Double maxRate, Integer assumedYears) {}
+    public record Calc(Long maxLimit, Double minRate, Double maxRate, Double assumedYears) {}
 
     /**
      * @param source "ai" 면 AI 가 고른 것, "rule" 이면 금리 기준으로 고른 것

@@ -32,8 +32,22 @@ public class ProductService {
      */
     private static final int ASSUMED_YEARS = 10;
 
+    /**
+     * 테스트용 상품의 id 앞머리.
+     *
+     * <p>DSR 경고 화면처럼 <b>실제 상품으로는 재현하기 어려운 경우</b>를 확인하려고 넣어둔
+     * 가짜 상품이 있다. 목록에는 보여야 눌러볼 수 있지만, <b>AI 추천 후보에서는 빼야 한다</b> —
+     * 시연 중에 AI 가 "이 상품을 추천합니다" 하고 테스트 데이터를 골라버리면 곤란하다.
+     */
+    private static final String TEST_PRODUCT_PREFIX = "TEST-";
+
     private final KbProductLoader kbProductLoader;
     private final AiPicker aiPicker;
+
+    /** 테스트용으로 넣어둔 가짜 상품인지. */
+    private boolean isTestProduct(ProductResponse.Item item) {
+        return item.productId() != null && item.productId().startsWith(TEST_PRODUCT_PREFIX);
+    }
 
     /** 상품 목록만. 추천은 붙이지 않는다(사용자 상황을 모르면 고를 근거가 없다). */
     public ProductResponse getAll() {
@@ -49,8 +63,12 @@ public class ProductService {
         List<ProductResponse.Item> all = toItems();
 
         String category = request.getCategory() == null ? "LOAN" : request.getCategory();
+        // 테스트 상품은 목록에는 남기고 추천 후보에서만 뺀다
         List<ProductResponse.Item> candidates =
-                all.stream().filter(item -> category.equals(item.category())).toList();
+                all.stream()
+                        .filter(item -> category.equals(item.category()))
+                        .filter(item -> !isTestProduct(item))
+                        .toList();
 
         if (candidates.size() < 2) {
             return new ProductResponse(all, null);
@@ -86,7 +104,28 @@ public class ProductService {
             if (maxLimit != null) {
                 specs.add(new ProductResponse.Spec("최대 한도", formatLimit(maxLimit)));
             }
-            specs.add(new ProductResponse.Spec("상환 기간", ASSUMED_YEARS + "년 가정"));
+
+            /* 원본에 상환 기간이 적혀 있으면 그 값을 쓰고, 없으면 10년으로 가정한다.
+               가정값일 때만 '가정' 이라고 밝힌다 — 적혀 있는 값까지 가정이라고 하면
+               어느 게 실제 상품 정보인지 구분이 안 된다.
+
+               개월로도 적을 수 있게 둔 이유 — 1년 미만인 상품을 년 단위로는 못 적는다. */
+            Integer months = intg(raw.get("repaymentMonths"));
+            Integer declaredYears = intg(raw.get("repaymentYears"));
+
+            double years;
+            String periodText;
+            if (months != null) {
+                years = months / 12.0;
+                periodText = months + "개월";
+            } else if (declaredYears != null) {
+                years = declaredYears;
+                periodText = declaredYears + "년";
+            } else {
+                years = ASSUMED_YEARS;
+                periodText = ASSUMED_YEARS + "년 가정";
+            }
+            specs.add(new ProductResponse.Spec("상환 기간", periodText));
 
             items.add(
                     new ProductResponse.Item(
@@ -96,7 +135,7 @@ public class ProductService {
                             rawCategory, // 배지에는 원본 분류를 그대로 (전세자금대출 / 주택담보대출)
                             str(raw.get("targetDescription")),
                             List.copyOf(specs),
-                            new ProductResponse.Calc(maxLimit, minRate, maxRate, ASSUMED_YEARS),
+                            new ProductResponse.Calc(maxLimit, minRate, maxRate, years),
                             str(raw.get("officialUrl"))));
         }
 
@@ -199,6 +238,10 @@ public class ProductService {
 
     private Long lng(Object v) {
         return v instanceof Number n ? n.longValue() : null;
+    }
+
+    private Integer intg(Object v) {
+        return v instanceof Number n ? n.intValue() : null;
     }
 
     private String money(Long v) {

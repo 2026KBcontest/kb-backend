@@ -190,34 +190,35 @@ public class RegionSwitchService {
     }
 
     /**
-     * 성격이 다른 추천 세 칸을 만든다.
+     * 축이 다른 추천 두 칸을 만든다.
      *
      * <pre>
-     *   ① 가장 저렴한 곳          계산   절감액 1위
-     *   ② 생활 여건이 비슷한 곳    AI     지하철·도심 접근성·상권을 보고 고름
-     *   ③ 그다음으로 볼 만한 곳    AI     ② 를 고를 때 함께 받은 2순위 (altId)
+     *   ① 가장 저렴한 곳     계산   절감액 1위
+     *   ② 여건이 비슷한 곳   AI     지하철·도심 접근성·상권을 보고 고름
      * </pre>
      *
      * <p><b>① 을 AI 에게 맡기지 않는 이유</b> — 이미 계산이 끝난 값이라 정답이 하나다.
      * 정답이 있는 걸 LLM 에게 물으면 느리고, 비용이 들고, 가끔 틀린다.
      * AI 는 우리 데이터에 없는 것(생활 여건)을 판단할 때만 쓴다.
      *
-     * <p><b>③ 이 '가장 빨리 갈 수 있는 곳' 이 아닌 이유</b> — 그건 ① 과 늘 같은 지역이다.
+     * <p><b>왜 세 칸이 아니라 두 칸인가</b> — 우리 데이터로 만들 수 있는 축이 둘뿐이다.
      *
      * <pre>
      *   자취 개월 = ceil((필요 초기자금 − 모은 돈) ÷ 월 저축액)
      * </pre>
      *
-     * 필요 자금이 적을수록 개월이 줄어드는 단조 관계라, <b>절감액 1위 = 단축 1위</b> 가
-     * 예외 없이 성립한다 (월세도 마찬가지 — 월세가 싸면 필요 자금도 적다).
-     * 처음엔 그렇게 만들었다가 세 번째 칸이 매번 겹쳐 사라지는 걸 보고 축을 바꿨다.
+     * 필요 자금이 적을수록 개월이 줄어드는 단조 관계라 <b>절감액 1위 = 단축 1위</b> 가
+     * 예외 없이 성립한다. 시세 CSV 를 실제로 대조해봐도 전세·월세·시점 단축이 대체로 한
+     * 지역으로 몰린다(성북구 인접 5개 구에서는 강북구가 세 축 모두 1위였다).
+     * 즉 <b>돈으로 만든 칸은 전부 ① 하나로 수렴한다.</b>
      *
-     * <p>③ 은 AI 응답의 {@code altId} 를 쓴다. <b>호출은 여전히 한 번</b>이다 —
-     * 애초에 "1순위와 2순위를 함께 달라" 는 형식이라 한 번에 둘이 온다.
+     * <p>그래서 한때 ③ 칸을 AI 응답의 {@code altId} 로 채웠는데, 그건 축이 아니라
+     * <b>같은 축의 2등</b>이었다. 2등은 1등이 이미 있는 화면에서 고를 이유가 없다.
+     * 칸을 채우려고 만든 칸은 선택지를 늘리는 게 아니라 판단을 흐린다.
      *
-     * <p><b>같은 지역이 두 칸에 겹치면 뒤 칸을 버린다.</b> 세 칸에 같은 이름이 나오면
-     * 나눠 보여준 의미가 없고, 오히려 선택지가 많은 것처럼 착각하게 만든다.
-     * 겹쳐서 한 칸만 남는다면 그건 "그 지역이 모든 면에서 낫다" 는 뜻이므로 그대로 보여준다.
+     * <p><b>두 칸이 같은 지역이면 뒤 칸을 버린다.</b> 같은 이름이 두 번 나오면 나눠 보여준
+     * 의미가 없고, 오히려 선택지가 많은 것처럼 착각하게 만든다. 한 칸만 남는다면 그건
+     * "그 지역이 돈으로도 여건으로도 낫다" 는 뜻이므로 그대로 보여준다.
      */
     private List<RegionOptionResponse.Pick> buildPicks(
             String currentRegion,
@@ -231,28 +232,24 @@ public class RegionSwitchService {
         // ① 가장 저렴한 곳 — candidates 는 이미 절감액 순으로 정렬돼 있다
         picks.add(cheapestPick(candidates.get(0), housingType));
 
-        /* ②③ 후보가 하나뿐이면 고를 게 없으므로 AI 를 부르지 않는다 (호출 = 비용) */
+        /* ② 후보가 하나뿐이면 고를 게 없으므로 AI 를 부르지 않는다 (호출 = 비용) */
         if (candidates.size() > 1) {
             AiPicker.Pick ai =
                     askAi(currentRegion, housingType, currentRequired, currentMonths, candidates);
 
             if (ai != null) {
-                picks.add(
-                        new RegionOptionResponse.Pick(
-                                "similar",
-                                "생활 여건이 비슷한 곳",
-                                "ai",
-                                ai.pickId(),
-                                soften(ai.headline(), ai.pickId()),
-                                ai.reasons()));
-
-                /* ③ 2순위. AiPicker 가 목록 밖이거나 1순위와 같은 altId 는 이미 걸러서 null 로 준다.
-                   설명은 AI 가 따로 써주지 않으므로 우리가 아는 숫자로 채운다 —
-                   고른 건 AI 지만 문장은 계산값이라, 없는 근거를 지어내지 않는다. */
+                // pickId 는 AiPicker 가 후보 목록 안의 값인지 이미 검증했다
                 candidates.stream()
-                        .filter(c -> c.region().equals(ai.altId()))
+                        .filter(c -> c.region().equals(ai.pickId()))
                         .findFirst()
-                        .map(c -> altPick(c, housingType))
+                        .map(
+                                c ->
+                                        similarPick(
+                                                c,
+                                                candidates.get(0),
+                                                housingType,
+                                                soften(ai.headline(), ai.pickId()),
+                                                ai.reasons()))
                         .ifPresent(picks::add);
             }
         }
@@ -282,7 +279,11 @@ public class RegionSwitchService {
         if (c.shortenMonths() != null && c.shortenMonths() > 0) {
             reasons.add(String.format("자취 시점은 %d개월 빨라져요", c.shortenMonths()));
         }
-        reasons.add("바로 옆이라 생활권이 크게 바뀌지 않아요");
+        /* 인접 구라는 사실만 적는다.
+           예전에는 "생활권이 크게 바뀌지 않아요" 였는데, 그건 계산한 값이 아니라 짐작이다.
+           지하철·상권 같은 생활 여건 데이터는 우리에게 없어서 ② 칸을 AI 에게 넘겼는데,
+           정작 계산 기반 칸에서 생활권을 단정하면 그 구분이 무너진다. */
+        reasons.add("지금 목표 지역과 맞닿아 있는 구예요");
 
         return new RegionOptionResponse.Pick(
                 "cheapest",
@@ -294,35 +295,51 @@ public class RegionSwitchService {
     }
 
     /**
-     * ③ 그다음으로 볼 만한 곳 — AI 가 2순위로 고른 지역.
+     * ② 여건이 비슷한 곳 — AI 가 생활 여건을 보고 고른 지역.
      *
-     * <p>고른 주체는 AI 라 {@code source} 는 "ai" 로 둔다. 다만 이유 문장은 AI 가 따로 써주지
-     * 않으므로 우리가 아는 숫자로만 채운다. 그럴듯한 설명을 지어내는 것보다 낫다.
+     * <p><b>이 칸은 ① 보다 비싸다.</b> ① 이 절감액 1위라 그럴 수밖에 없다. 그러면
+     * 사용자에게는 "더 비싼데 왜?" 라는 질문이 남는데, 예전에는 화면이 거기에 답하지 않았다.
+     * AI 가 쓴 "지하철이 이어져요" 만 있고 <b>대신 얼마를 더 내는지가 없었다.</b>
+     *
+     * <p>그래서 마지막에 한 줄을 덧붙인다 — <b>① 보다 얼마를 더 쓰는지</b>.
+     * 그래야 두 칸이 "싼 곳" 과 "돈을 더 내고 무언가를 지키는 곳" 이 되어 고를 수 있게 된다.
+     * 유리한 숫자만 적으면 비교가 아니라 광고다.
+     *
+     * <p><b>역할이 섞이지 않는다</b> — 여건 판단과 그 이유는 AI 가 쓰고(우리 데이터에 없는 것),
+     * 얼마를 더 내는지는 코드가 계산해서 붙인다(틀리면 안 되는 숫자).
+     *
+     * @param c AI 가 고른 지역
+     * @param cheapest ① 칸의 지역. 얼마를 더 쓰는지 적으려면 필요하다
+     * @param headline AI 가 쓴 한 줄 (지시조는 이미 걸러진 상태)
+     * @param aiReasons AI 가 쓴 이유. 그대로 두고 뒤에만 덧붙인다
      */
-    private RegionOptionResponse.Pick altPick(
-            RegionOptionResponse.Candidate c, HousingType housingType) {
+    private RegionOptionResponse.Pick similarPick(
+            RegionOptionResponse.Candidate c,
+            RegionOptionResponse.Candidate cheapest,
+            HousingType housingType,
+            String headline,
+            List<String> aiReasons) {
 
-        List<String> reasons = new ArrayList<>();
-        if (housingType == HousingType.JEONSE) {
-            reasons.add(String.format("초기 자금이 %,d원 적게 들어요", c.savedAmount()));
-        } else {
-            reasons.add(String.format("월세가 매달 %,d원 적어요", c.monthlyRentSaved()));
-        }
-        if (c.estimatedMonths() != null) {
+        List<String> reasons = new ArrayList<>(aiReasons);
+
+        /* ① 과 같은 지역이면 덧붙일 말이 없다 (뒤에서 중복으로 걸러지기도 한다).
+           금액이 같은 다른 지역일 수도 있어 지역 이름이 아니라 차액으로 판단한다. */
+        long gap =
+                housingType == HousingType.JEONSE
+                        ? cheapest.savedAmount() - c.savedAmount()
+                        : cheapest.monthlyRentSaved() - c.monthlyRentSaved();
+
+        if (!c.region().equals(cheapest.region()) && gap > 0) {
             reasons.add(
-                    c.estimatedMonths() == 0
-                            ? "지금 모은 돈으로 바로 들어갈 수 있어요"
-                            : String.format("지금 저축 속도로 %d개월이면 돼요", c.estimatedMonths()));
+                    housingType == HousingType.JEONSE
+                            ? String.format(
+                                    "%s보다 초기 자금이 %,d원 더 필요해요", cheapest.region(), gap)
+                            : String.format(
+                                    "%s보다 월세가 매달 %,d원 더 나가요", cheapest.region(), gap));
         }
-        reasons.add("AI 가 두 번째로 꼽은 곳이에요");
 
         return new RegionOptionResponse.Pick(
-                "alt",
-                "그다음으로 볼 만한 곳",
-                "ai",
-                c.region(),
-                c.region() + "도 후보로 남겨둘 만해요",
-                reasons);
+                "similar", "여건이 비슷한 곳", "ai", c.region(), headline, reasons);
     }
 
     /**
@@ -352,8 +369,8 @@ public class RegionSwitchService {
      * <p>기준을 프롬프트에 못 박아두는 이유 — "알아서 비슷한 곳" 이라고만 하면 실행할 때마다
      * 근거가 달라져 시연 중에 다른 답이 나온다. 무엇을 보고 골랐는지도 설명할 수 없게 된다.
      *
-     * <p>1순위(pickId)와 2순위(altId)를 한 번에 받는다. 그래서 카드 두 칸을 만들면서도
-     * AI 호출은 한 번뿐이다.
+     * <p>호출은 화면 한 번에 한 번뿐이다. AiPicker 응답의 {@code altId}(2순위)는 받지만
+     * 쓰지 않는다 — 2순위는 축이 아니라 같은 축의 등수라 카드가 될 수 없다.
      *
      * @return 실패하거나 목록 밖을 고르면 null (②③ 칸이 그냥 빠진다)
      */
@@ -407,7 +424,6 @@ public class RegionSwitchService {
                 reasons 에는 위 기준 중 실제로 근거가 된 것을 구체적으로 적으세요.
                 (예: "4호선이 그대로 이어져 환승 없이 다닐 수 있어요")
                 금액은 %s
-                altId 에는 그다음으로 볼 만한 곳을 하나 더 적어주세요. 없으면 비워두세요.
                 지금 지역을 그만두라는 뜻이 아니라 비교해볼 선택지를 보여주는 것입니다.
                 """
                         .formatted(

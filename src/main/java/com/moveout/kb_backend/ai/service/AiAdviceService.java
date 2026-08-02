@@ -1,6 +1,7 @@
 package com.moveout.kb_backend.ai.service;
 
 import com.moveout.kb_backend.ai.client.AiAnswer;
+import com.moveout.kb_backend.ai.client.CitationMarks;
 import com.moveout.kb_backend.ai.client.PerplexityClient;
 import com.moveout.kb_backend.ai.dto.AiAdviceRequest;
 import com.moveout.kb_backend.ai.dto.AiAdviceResponse;
@@ -34,6 +35,7 @@ public class AiAdviceService {
             3. 무엇을 먼저 하면 좋을지 한 가지를 분명히 알려주세요.
             4. 존댓말로 쓰고, 사용자를 탓하거나 다그치지 마세요.
             5. 확실하지 않으면 단정하지 말고 "확인이 필요해요" 라고 쓰세요.
+            6. [1], [2][5] 같은 출처 번호를 문장에 넣지 마세요. 화면에 그대로 노출됩니다.
             """;
 
     /** scope 별로 무엇을 봐야 하는지 알려준다. 같은 숫자라도 화면마다 관심사가 다르다. */
@@ -59,7 +61,8 @@ public class AiAdviceService {
         return AiAdviceResponse.builder()
                 // 진짜 AI 답변일 때만 "ai". 준비된 문장을 돌려줄 땐 "rule" 로 정직하게 표기한다.
                 .source(answered ? "ai" : "rule")
-                .text(answered ? answer.content().trim() : FALLBACK_TEXT)
+                // 본문에 박혀 오는 출처 번호([1][6])를 걷어낸다. 화면에 그 번호가 가리킬 목록이 없다.
+                .text(answered ? CitationMarks.strip(answer.content()) : FALLBACK_TEXT)
                 .updatedAt(OffsetDateTime.now().toString())
                 .build();
     }

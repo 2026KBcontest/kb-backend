@@ -1,6 +1,7 @@
 package com.moveout.kb_backend.ai.service;
 
 import com.moveout.kb_backend.ai.client.AiAnswer;
+import com.moveout.kb_backend.ai.client.CitationMarks;
 import com.moveout.kb_backend.ai.client.PerplexityClient;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,6 +50,7 @@ public class AiPicker {
                  쓰지 말 것 : "~하세요", "~하시면 됩니다", "~해야 해요", "~을 추천합니다"
                  이렇게 쓸 것 : "~는 어떠세요?", "~도 살펴볼 만해요", "~를 눈여겨볼 만해요"
             7. reasons 에는 왜 그렇게 봤는지를 적으세요. 지시문을 반복하지 마세요.
+            8. [1], [2][5] 같은 출처 번호를 문장에 넣지 마세요. 화면에 그대로 노출됩니다.
             """;
 
     /** 답변을 이 모양으로만 하게 강제한다. 자유 문장으로 받으면 화면에 넣을 수 없다. */
@@ -131,7 +133,10 @@ public class AiPicker {
             Map<String, Object> root = objectMapper.readValue(answer.content(), Map.class);
 
             String pickId = asString(root.get("pickId"));
-            String headline = asString(root.get("headline"));
+
+            /* 화면에 그대로 나가는 글에서는 출처 번호([1][6])를 걷어낸다.
+               pickId 는 우리가 준 id 와 문자 단위로 대조해야 하므로 손대지 않는다. */
+            String headline = CitationMarks.strip(asString(root.get("headline")));
 
             // ★ 환각 차단 — 목록에 없는 걸 골랐으면 응답 전체를 버린다.
             //    일부만 고쳐서 쓰면 이유 문장이 엉뚱한 후보를 설명하게 된다.
@@ -146,7 +151,7 @@ public class AiPicker {
             List<String> reasons = new ArrayList<>();
             if (root.get("reasons") instanceof List<?> list) {
                 for (Object item : list) {
-                    String text = asString(item);
+                    String text = CitationMarks.strip(asString(item));
                     if (text != null && !text.isBlank()) {
                         reasons.add(text);
                     }
